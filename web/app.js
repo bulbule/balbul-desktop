@@ -10,9 +10,9 @@ let conversations = [], friends = [];
 async function explainNetworkFailure() {
   if (!navigator.onLine) return 'Koneksi internet browser sedang offline. Sambungkan internet lalu coba lagi.';
   try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, { method: 'GET', cache: 'no-store' });
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, { method: 'GET', cache: 'no-store', headers: { apikey: SUPABASE_PUBLISHABLE_KEY } });
     if (response.ok) return 'Server Supabase bisa dijangkau, tetapi permintaan akun gagal. Coba muat ulang halaman; jika berulang, kirim screenshot Console/Network agar penyebab CORS atau browser bisa dipastikan.';
-    return `Server Supabase merespons HTTP ${response.status}. Coba lagi beberapa saat.`;
+    return `Koneksi ke Supabase berhasil, tetapi endpoint pemeriksaan merespons HTTP ${response.status}. Coba daftar sekali lagi; jika gagal, pesan error asli akan ditampilkan.`;
   } catch (_) {
     return 'Browser tidak dapat menjangkau server Supabase. Cek koneksi internet, VPN, DNS, atau ekstensi pemblokir iklan/privacy. Ini bukan error password atau database.';
   }
