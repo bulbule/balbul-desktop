@@ -417,7 +417,7 @@ async function respondFriendRequest(req,accept){
 async function loadCloudConversations(){
   const {data:memberships,error}=await cloud.from('conversation_members').select('conversation_id').eq('user_id',cloudUser.id);
   if(error)throw error;const ids=[...new Set((memberships||[]).map(x=>x.conversation_id))];
-  if(!ids.length){conversations=[];if(view==='chat')renderChatView();return;}
+  if(!ids.length){conversations=[];activeConversation=null;if(view==='chat')renderChatView();return;}
   const {data:rows,error:e}=await cloud.from('conversations').select('*').in('id',ids).order('created_at',{ascending:false});if(e)throw e;
   const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);if(m)throw m;
   const otherIds=[...new Set((members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id))];
