@@ -57,3 +57,9 @@ with check (
 
 create index if not exists task_members_user_task_idx
 on public.task_members(user_id, task_id);
+
+-- Prevent shared members from transferring ownership or changing visibility.
+-- Only collaboration fields can be updated by authenticated users.
+revoke update on table public.tasks from authenticated;
+grant update (title, description, status, priority, due_at, completed_at, updated_at)
+on table public.tasks to authenticated;
