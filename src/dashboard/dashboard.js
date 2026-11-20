@@ -568,10 +568,10 @@ function renderSharedTasksView(){
       const {error}=await cloud.from('tasks').update({status:next,updated_at:new Date().toISOString(),completed_at:next==='completed'?new Date().toISOString():null}).eq('id',task.id);
       if(error){cloudNotice(error.message,true);e.target.value=task.status;}else{cloudNotice('Status tugas berhasil disinkronkan.');await loadSharedTasks();}
     }},[
-      h('option',{value:'pending'},'Belum mulai'),
-      h('option',{value:'in_progress'},'Sedang dikerjakan'),
-      h('option',{value:'completed'},'Selesai'),
-      h('option',{value:'cancelled'},'Dibatalkan')
+      h('option',{value:'pending',selected:task.status==='pending'},'Belum mulai'),
+      h('option',{value:'in_progress',selected:task.status==='in_progress'},'Sedang dikerjakan'),
+      h('option',{value:'completed',selected:task.status==='completed'},'Selesai'),
+      h('option',{value:'cancelled',selected:task.status==='cancelled'},'Dibatalkan')
     ]);
     const owner=task.owner_id===cloudUser.id;
     return h('article',{class:'shared-task-card'},
