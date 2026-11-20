@@ -18,6 +18,7 @@ let editingId = null;
 let cloud = null, cloudUser = null, cloudProfile = null;
 let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null;
 let sharedTasks = [], taskMembersById = {};
+const openingDirectIds = new Set();
 let realtimeChannels = [];
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
@@ -366,7 +367,7 @@ function renderFriendsView() {
   const friends = friendRows.length ? friendRows.map(p=>h('div',{class:'cloud-person'},
     h('div',{class:'cloud-avatar'},(p.display_name||'B').slice(0,1).toUpperCase()),
     h('div',{class:'cloud-person-info'},h('strong',{},p.display_name||'Teman'),h('small',{},p.friend_code||'')),
-    h('button',{class:'cloud-btn small',type:'button',onclick:()=>openDirectChat(p)},'Chat')))
+    h('button',{class:'cloud-btn small',type:'button',onclick:(e)=>openDirectChat(p,e.currentTarget)},'Chat')))
     : [h('div',{class:'cloud-empty'},'Belum ada teman. Bagikan Friend ID kamu!')];
   const codeBox=h('div',{class:'cloud-code'},h('strong',{},code),
     h('button',{class:'cloud-btn',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(code);cloudNotice('Friend ID berhasil disalin.');}catch(_){cloudNotice('Friend ID: '+code,true);}}},'Salin ID'));
@@ -422,7 +423,9 @@ async function loadCloudConversations(){
   const otherIds=[...new Set((members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id))];
   const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};if(p)throw p;
   const byId=Object.fromEntries((people||[]).map(x=>[x.id,x]));
-  conversations=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean)}));
+  const mapped=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean)}));
+  const seen=new Set();conversations=mapped.filter(conv=>{if(conv.kind!=='direct')return true;const otherId=conv.other[0]?.id;if(!otherId)return true;if(seen.has(otherId))return false;seen.add(otherId);return true;});
+  if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   if(view==='chat')renderChatView();
 }
 function renderChatView(){
@@ -434,7 +437,7 @@ function renderChatView(){
   }):[h('div',{class:'cloud-empty'},'Belum ada percakapan. Tambahkan teman dulu.')];
   const pane=h('section',{class:'chat-pane'});
   if(!activeConversation)pane.append(h('div',{class:'cloud-empty chat-placeholder'},'Pilih teman untuk mulai ngobrol.'));
-  else pane.append(h('div',{class:'chat-pane-head'},h('strong',{},activeConversation.other[0]?.display_name||'Chat')),
+  else pane.append(h('div',{class:'chat-pane-head'},h('div',{class:'chat-peer'},h('span',{class:'cloud-avatar'},(activeConversation.other[0]?.display_name||'B').slice(0,1).toUpperCase()),h('strong',{},activeConversation.other[0]?.display_name||'Chat')),h('button',{class:'chat-leave-btn',type:'button',onclick:leaveDesktopConversation},'Hapus chat')),
     h('div',{id:'desktop-messages',class:'desktop-messages'}),
     h('form',{class:'desktop-message-form',onsubmit:sendDesktopMessage},
       h('input',{id:'desktop-message-input',maxlength:'4000',placeholder:'Tulis pesan...',autocomplete:'off'}),
@@ -443,14 +446,28 @@ function renderChatView(){
     h('div',{id:'cloud-notice',class:'cloud-notice'}),h('div',{class:'desktop-chat-layout'},h('div',{class:'chat-conversation-list'},list),pane));
   if(activeConversation){startChatRealtime(activeConversation.id);loadCloudMessages(activeConversation.id);}
 }
-async function openDirectChat(person){
+async function openDirectChat(person,button){
+  if(openingDirectIds.has(person.id))return;
+  openingDirectIds.add(person.id);
+  const original=button?.textContent;
+  if(button){button.disabled=true;button.textContent='Membuka…';button.classList.add('is-loading');}
   try{
-    const existing=conversations.find(x=>x.kind==='direct'&&x.other.some(p=>p.id===person.id));
-    if(existing){activeConversation=existing;view='chat';render();return;}
-    const {data:conv,error}=await cloud.from('conversations').insert({kind:'direct',created_by:cloudUser.id}).select().single();if(error)throw error;
-    const {error:mErr}=await cloud.from('conversation_members').insert([{conversation_id:conv.id,user_id:cloudUser.id},{conversation_id:conv.id,user_id:person.id}]);if(mErr)throw mErr;
-    await loadCloudConversations();activeConversation=conversations.find(x=>x.id===conv.id)||null;view='chat';render();
+    const {data:conversationId,error}=await cloud.rpc('open_direct_conversation',{p_friend_id:person.id});
+    if(error)throw error;
+    await loadCloudConversations();
+    activeConversation=conversations.find(x=>x.id===conversationId)||conversations.find(x=>x.kind==='direct'&&x.other.some(p=>p.id===person.id))||null;
+    view='chat';render();
   }catch(err){cloudNotice(err.message||'Gagal membuka chat.',true);}
+  finally{openingDirectIds.delete(person.id);if(button){button.disabled=false;button.textContent=original||'Chat';button.classList.remove('is-loading');}}
+}
+async function leaveDesktopConversation(){
+  if(!activeConversation||!window.confirm('Hapus chat ini dari daftar kamu? Riwayat pesan temanmu tidak akan dihapus.'))return;
+  const id=activeConversation.id;
+  const {error}=await cloud.from('conversation_members').delete().eq('conversation_id',id).eq('user_id',cloudUser.id);
+  if(error){cloudNotice(error.message,true);return;}
+  activeConversation=null;
+  await loadCloudConversations();
+  view='chat';render();cloudNotice('Chat dihapus dari daftar kamu. Riwayat temanmu tetap aman.');
 }
 function openCloudConversation(conv){activeConversation=conv;view='chat';render();}
 async function loadCloudMessages(id){
