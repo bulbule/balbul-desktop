@@ -480,9 +480,12 @@ function startCloudRealtime(){
   const friendsChannel=cloud.channel('balbul-desktop-friends-'+cloudUser.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests',filter:'receiver_id=eq.'+cloudUser.id},()=>loadFriendData().catch(console.error))
     .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error)).subscribe();
+  const tasksChannel=cloud.channel('balbul-desktop-tasks-'+cloudUser.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>loadSharedTasks().catch(console.error))
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_members',filter:'user_id=eq.'+cloudUser.id},()=>loadSharedTasks().catch(console.error)).subscribe();
   const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>loadCloudConversations().catch(console.error)).subscribe();
-  realtimeChannels.push(friendsChannel,membersChannel);
+  realtimeChannels.push(friendsChannel,membersChannel,tasksChannel);
 }
 function startChatRealtime(id){
   const channelName='balbul-desktop-chat-'+id;
@@ -492,7 +495,7 @@ function startChatRealtime(id){
 }
 window.addEventListener('balbul-auth-ready',async event=>{
   cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;
-  try{await Promise.all([loadFriendData(),loadCloudConversations()]);startCloudRealtime();}
+  try{await Promise.all([loadFriendData(),loadCloudConversations(),loadSharedTasks()]);startCloudRealtime();}
   catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);}
 });
 
