@@ -343,8 +343,16 @@ api.on('settings-changed', (s) => {
 // perbarui label "Telat" tiap 30 detik
 setInterval(() => { if (view !== 'settings' && !dlg.open) render(); }, 30000);
 
-Promise.all([api.listTasks(), api.getSettings()]).then(([list, s]) => {
-  tasks = list;
-  settings = s;
-  render();
+let dashboardReady = false;
+window.addEventListener('balbul-auth-ready', async () => {
+  try {
+    const [list, s] = await Promise.all([api.listTasks(), api.getSettings()]);
+    tasks = list;
+    settings = s;
+    dashboardReady = true;
+    render();
+  } catch (error) {
+    console.error('Gagal memuat dashboard:', error);
+  }
 });
+
