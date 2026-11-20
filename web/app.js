@@ -7,6 +7,17 @@ const landingView = $('#landingView'), authView = $('#authView'), appView = $('#
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
 let conversations = [], friends = [];
 const openingDirectIds = new Set();
+let unreadChats = {}, soundEnabled = localStorage.getItem('balbul-chat-sound') !== 'off', audioContext = null, globalMessageChannel = null;
+const seenMessageIds = new Set();
+function unreadStorageKey(){return 'balbul-unread-'+(user?.id||'guest');}
+function loadUnread(){try{unreadChats=JSON.parse(localStorage.getItem(unreadStorageKey())||'{}')||{};}catch(_){unreadChats={};}}
+function saveUnread(){localStorage.setItem(unreadStorageKey(),JSON.stringify(unreadChats));}
+function setUnread(id,on){if(on)unreadChats[id]=true;else delete unreadChats[id];saveUnread();renderConversations();updateChatNavDot();}
+function updateChatNavDot(){const nav=document.querySelector('.nav[data-panel="chats"]');if(!nav)return;let dot=nav.querySelector('.unread-dot');const hasUnread=Object.keys(unreadChats).length>0;if(hasUnread&&!dot){dot=document.createElement('i');dot.className='unread-dot';dot.setAttribute('aria-label','Pesan belum dibaca');nav.append(dot);}else if(!hasUnread&&dot)dot.remove();}
+function playIncomingSound(){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext ||= new Ctx();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.setValueAtTime(880,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(660,audioContext.currentTime+.12);gain.gain.setValueAtTime(.0001,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.08,audioContext.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.2);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.21);}catch(_){}}
+function toggleChatSound(){soundEnabled=!soundEnabled;localStorage.setItem('balbul-chat-sound',soundEnabled?'on':'off');updateSoundButton();if(soundEnabled)playIncomingSound();}
+function updateSoundButton(){const b=$('#chatSoundToggle');if(b){b.textContent=soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati';b.classList.toggle('sound-off',!soundEnabled);b.setAttribute('aria-pressed',String(soundEnabled));}}
+function receiveIncomingMessage(message){if(!message?.id||seenMessageIds.has(message.id))return;seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);if(message.sender_id===user?.id)return;if(activeConversation?.id===message.conversation_id){appendMessage(message);return;}setUnread(message.conversation_id,true);playIncomingSound();}
 
 async function explainNetworkFailure() {
   if (!navigator.onLine) return 'Koneksi internet browser sedang offline. Sambungkan internet lalu coba lagi.';
@@ -80,6 +91,7 @@ $('#signOut').addEventListener('click', async () => { await supabase.auth.signOu
 
 async function enterApp(currentUser) {
   user = currentUser;
+  loadUnread();
   const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   if (error) throw error;
   profile = data;
@@ -90,8 +102,11 @@ async function enterApp(currentUser) {
   $('#myCode').textContent = profile.friend_code || '—';
   $('#myAvatar').textContent = (profile.display_name || 'b').slice(0,1).toUpperCase();
   await loadFriends(); await loadConversations();
+  if(globalMessageChannel)await supabase.removeChannel(globalMessageChannel);
+  globalMessageChannel=supabase.channel('balbul-incoming-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveIncomingMessage(payload.new)).subscribe();
+  updateChatNavDot();updateSoundButton();
 }
-function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel); }
+function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel);if(globalMessageChannel){supabase.removeChannel(globalMessageChannel);globalMessageChannel=null;} }
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'PASSWORD_RECOVERY') { notice('Sesi pemulihan password aktif. Fitur ubah password akan tersedia di pengaturan akun.'); return; }
   if (session?.user && session.user.email_confirmed_at) {
@@ -110,6 +125,7 @@ document.querySelectorAll('.nav').forEach(b => b.addEventListener('click', () =>
   $('#friendsPanel').classList.toggle('hidden',!friendsMode);
   $('#chatPanel').classList.toggle('hidden',friendsMode);
 }));
+$('#chatSoundToggle')?.addEventListener('click',toggleChatSound);
 $('#newChat').addEventListener('click', showFriendsPanel);
 $('#emptyNewChat').addEventListener('click', showFriendsPanel);
 function showFriendsPanel(){ document.querySelector('[data-panel="friends"]').click(); }
@@ -160,7 +176,7 @@ async function loadConversations(){
   if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   renderConversations();
 }
-function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>';row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
+function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'')+(unreadChats[c.id]?' has-unread':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>'+(unreadChats[c.id]?'<i class="unread-dot" aria-label="Pesan belum dibaca"></i>':'');row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
 async function openDirect(p,button){
   if(openingDirectIds.has(p.id))return;
   openingDirectIds.add(p.id);
@@ -175,7 +191,7 @@ async function openDirect(p,button){
   }catch(err){alert(err.message||'Gagal membuka chat.');}
   finally{openingDirectIds.delete(p.id);if(button){button.disabled=false;button.textContent=original||'Chat';button.classList.remove('is-loading');}}
 }
-async function openConversation(c){activeConversation=c;$('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}renderConversations();if(messageChannel)await supabase.removeChannel(messageChannel);await loadMessages(c.id);messageChannel=supabase.channel('balbul-chat-'+c.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+c.id},payload=>appendMessage(payload.new)).subscribe();}
+async function openConversation(c){activeConversation=c;setUnread(c.id,false);$('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}renderConversations();if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}await loadMessages(c.id);}
 async function leaveCurrentConversation(){
   if(!activeConversation||!confirm('Hapus chat ini dari daftar kamu? Riwayat pesan temanmu tidak akan dihapus.'))return;
   const id=activeConversation.id;
