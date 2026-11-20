@@ -5,7 +5,8 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "dist:win": "electron-builder --win nsis --x64"
   },
   "author": "bulbule",
   "license": "MIT",
@@ -26,13 +27,23 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.png"
     },
     "nsis": {
-      "oneClick": true,
-      "perMachine": false
-    }
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "balBul"
+    },
+    "artifactName": "balBul-Setup.${ext}"
   }
 }
