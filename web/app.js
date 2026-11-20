@@ -7,6 +7,17 @@ const landingView = $('#landingView'), authView = $('#authView'), appView = $('#
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
 let conversations = [], friends = [];
 
+async function explainNetworkFailure() {
+  if (!navigator.onLine) return 'Koneksi internet browser sedang offline. Sambungkan internet lalu coba lagi.';
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/health`, { method: 'GET', cache: 'no-store' });
+    if (response.ok) return 'Server Supabase bisa dijangkau, tetapi permintaan akun gagal. Coba muat ulang halaman; jika berulang, kirim screenshot Console/Network agar penyebab CORS atau browser bisa dipastikan.';
+    return `Server Supabase merespons HTTP ${response.status}. Coba lagi beberapa saat.`;
+  } catch (_) {
+    return 'Browser tidak dapat menjangkau server Supabase. Cek koneksi internet, VPN, DNS, atau ekstensi pemblokir iklan/privacy. Ini bukan error password atau database.';
+  }
+}
+
 function notice(message, error = false) {
   const el = $('#authMessage'); el.textContent = message; el.classList.toggle('error', error);
 }
@@ -50,7 +61,12 @@ $('#authForm').addEventListener('submit', async e => {
       if (!data.user.email_confirmed_at) { await supabase.auth.signOut(); throw new Error('Email belum diverifikasi. Cek inbox atau kirim ulang email verifikasi.'); }
       await enterApp(data.user);
     }
-  } catch (err) { notice(err.message || 'Terjadi kesalahan.', true); }
+  } catch (err) {
+    const message = /failed to fetch|networkerror|load failed/i.test(err.message || '')
+      ? await explainNetworkFailure()
+      : (err.message || 'Terjadi kesalahan.');
+    notice(message, true);
+  }
 });
 
 $('#forgotBtn').addEventListener('click', async () => {
