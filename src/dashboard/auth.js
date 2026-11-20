@@ -19,6 +19,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   },
 });
 
+window.balbulCloud = { supabase };
+
 const $ = (selector) => document.querySelector(selector);
 const form = $('#auth-form');
 const message = $('#auth-message');
