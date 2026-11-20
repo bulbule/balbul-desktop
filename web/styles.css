@@ -30,3 +30,14 @@
 .composer input { border-radius:13px; border:1px solid #dcebed; background:#fbfeff; padding:12px 14px; outline:none; transition:border-color .16s ease,box-shadow .16s ease; }
 .composer input:focus { border-color:#65cbd5; box-shadow:0 0 0 3px rgba(32,185,201,.12); }
 .composer button.primary { min-width:46px; border-radius:13px; box-shadow:0 5px 14px rgba(23,174,190,.18); }
+
+/* Incoming chat indicators and sound preference */
+.chat-head-actions { display:flex; align-items:center; gap:8px; }
+.sound-toggle { border:1px solid #dcebed; border-radius:10px; padding:8px 10px; color:#52727c; background:#f7fcfd; font:inherit; font-size:10px; font-weight:650; cursor:pointer; white-space:nowrap; transition:all .16s ease; }
+.sound-toggle:hover { border-color:#9bdde4; background:#effbfc; color:#087f90; }
+.sound-toggle.sound-off { color:#91a4aa; background:#f5f7f8; }
+.unread-dot { display:inline-block; width:9px; height:9px; min-width:9px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.12); vertical-align:middle; margin-left:auto; flex:none; }
+.nav .unread-dot { margin-left:auto; }
+.list-row.has-unread .details strong { font-weight:800; color:#087f90; }
+.list-row.has-unread { background:#f4fcf9; }
+@media(max-width:650px){.sound-toggle{padding:7px 8px;font-size:9px}}
