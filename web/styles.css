@@ -20,3 +20,13 @@
 #signOut:hover { color:#b64c58; border-color:#f1cbd0; background:#fff7f7; transform:translateY(-1px); }
 #signOut:focus-visible,.chat-leave-btn:focus-visible,.chat-action:focus-visible { outline:3px solid rgba(32,185,201,.22); outline-offset:2px; }
 @media(max-width:650px){.room-head{padding:0 12px}.chat-leave-btn{padding:7px 9px;font-size:10px}}
+
+.chat-room { background:linear-gradient(180deg,#fbfeff 0%,#f8fcfd 100%); }
+.room-head { background:rgba(255,255,255,.88); backdrop-filter:blur(10px); }
+.messages { background-image:radial-gradient(#d8edf0 0.65px,transparent 0.65px); background-size:18px 18px; }
+.bubble { box-shadow:0 3px 12px rgba(25,80,95,.045); border:1px solid rgba(219,238,241,.85); }
+.bubble.mine { border-color:#c5edf0; }
+.composer { background:rgba(255,255,255,.92); }
+.composer input { border-radius:13px; border:1px solid #dcebed; background:#fbfeff; padding:12px 14px; outline:none; transition:border-color .16s ease,box-shadow .16s ease; }
+.composer input:focus { border-color:#65cbd5; box-shadow:0 0 0 3px rgba(32,185,201,.12); }
+.composer button.primary { min-width:46px; border-radius:13px; box-shadow:0 5px 14px rgba(23,174,190,.18); }
