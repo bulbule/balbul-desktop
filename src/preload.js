@@ -5,6 +5,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor'];
 
 contextBridge.exposeInMainWorld('balbul', {
+  // penyimpanan sesi akun (terenkripsi oleh main process)
+  authStorage: {
+    get: () => ipcRenderer.invoke('auth-storage:get'),
+    set: (value) => ipcRenderer.invoke('auth-storage:set', value),
+    remove: () => ipcRenderer.invoke('auth-storage:remove'),
+  },
+
   // tugas
   listTasks: () => ipcRenderer.invoke('tasks:list'),
   addTask: (data) => ipcRenderer.invoke('tasks:add', data),
