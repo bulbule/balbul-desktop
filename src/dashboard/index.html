@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'">
+  <title>balBul</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand">
+      <img src="../../assets/sprites/idle.png" alt="" class="brand-img">
+      <div>
+        <div class="brand-name">balBul</div>
+        <div class="brand-sub">Desktop Assistant</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <button data-view="today" class="active" type="button">Tugas Hari Ini</button>
+      <button data-view="all" type="button">Semua Tugas</button>
+      <button data-view="done" type="button">Selesai</button>
+      <button data-view="settings" type="button">Pengaturan</button>
+    </nav>
+    <img id="side-sprite" src="../../assets/sprites/idle.png" alt="" class="side-sprite">
+  </aside>
+
+  <main id="main"></main>
+
+  <dialog id="dlg">
+    <form id="form" autocomplete="off">
+      <h2 id="form-title">Tambah Tugas</h2>
+
+      <label>Judul
+        <input id="f-title" type="text" maxlength="200" required placeholder="Contoh: Edit video promosi">
+      </label>
+
+      <label>Catatan (opsional)
+        <textarea id="f-desc" rows="2" maxlength="2000"></textarea>
+      </label>
+
+      <div class="row">
+        <label>Prioritas
+          <select id="f-priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </label>
+        <label>Deadline (opsional)
+          <input id="f-deadline" type="datetime-local">
+        </label>
+      </div>
+
+      <label>Ingatkan saya
+        <select id="f-remind">
+          <option value="none">Tidak usah</option>
+          <option value="0">Tepat saat deadline</option>
+          <option value="10">10 menit sebelumnya</option>
+          <option value="30">30 menit sebelumnya</option>
+          <option value="60">1 jam sebelumnya</option>
+          <option value="1440">1 hari sebelumnya</option>
+          <option value="custom">Pilih waktu sendiri...</option>
+        </select>
+      </label>
+
+      <label id="custom-wrap" class="hidden">Waktu pengingat
+        <input id="f-custom" type="datetime-local">
+      </label>
+
+      <p id="form-error" class="error hidden"></p>
+
+      <div class="actions">
+        <button type="button" id="btn-cancel" class="ghost">Batal</button>
+        <button type="submit" class="primary">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
