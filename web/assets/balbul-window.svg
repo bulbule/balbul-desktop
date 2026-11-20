@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" role="img" aria-label="Pixel art window with balBul robot working at a desk">
+<defs><linearGradient id="wall" x2="0" y2="1"><stop stop-color="#174b78"/><stop offset="1" stop-color="#071d3d"/></linearGradient><linearGradient id="glass" x2="0" y2="1"><stop stop-color="#143b67"/><stop offset="1" stop-color="#081b3b"/></linearGradient><linearGradient id="curtain" x2="1" y2="0"><stop stop-color="#0b3a68"/><stop offset=".5" stop-color="#247db4"/><stop offset="1" stop-color="#0b315d"/></linearGradient><linearGradient id="bot" x2="0" y2="1"><stop stop-color="#a4fbff"/><stop offset=".45" stop-color="#12b9d4"/><stop offset="1" stop-color="#075080"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect x="24" y="25" width="712" height="500" fill="#06172e"/><rect x="39" y="40" width="682" height="470" fill="url(#wall)" stroke="#163e68" stroke-width="12"/>
+<rect x="125" y="83" width="510" height="340" fill="#07172f" stroke="#24537d" stroke-width="17"/><rect x="146" y="104" width="468" height="298" fill="url(#glass)"/>
+<g fill="#b5f5ff"><rect x="190" y="137" width="5" height="5"/><rect x="245" y="177" width="4" height="4"/><rect x="545" y="148" width="5" height="5"/><rect x="485" y="120" width="3" height="3"/><rect x="570" y="214" width="4" height="4"/><rect x="220" y="250" width="4" height="4"/></g>
+<g stroke="#3a7198" stroke-width="7"><path d="M146 238h468M146 321h468"/></g><rect x="320" y="104" width="9" height="298" fill="#244f78"/>
+<g fill="#6da5c4"><rect x="178" y="160" width="62" height="42"/><rect x="184" y="167" width="50" height="28" fill="#173b60"/><path d="M194 181l8 7 13-14" fill="none" stroke="#6eeaf2" stroke-width="4"/></g>
+<g fill="#d2eaff"><rect x="475" y="249" width="76" height="86"/><rect x="483" y="258" width="60" height="68" fill="#f2dfb8"/><path d="M493 275l5 5 9-11M493 296l5 5 9-11" stroke="#159a9e" stroke-width="4" fill="none"/><path d="M514 277h22M514 298h22" stroke="#55738a" stroke-width="3"/></g>
+<!-- pixel vines -->
+<g fill="#5d9a63" stroke="#274f55" stroke-width="3"><rect x="86" y="57" width="22" height="18"/><rect x="105" y="72" width="18" height="16"/><rect x="630" y="65" width="18" height="18"/><rect x="648" y="80" width="20" height="17"/><rect x="90" y="410" width="17" height="19"/><rect x="109" y="426" width="20" height="16"/><rect x="640" y="420" width="18" height="18"/></g>
+<!-- curtain rod and curtains -->
+<rect x="64" y="65" width="632" height="22" fill="#0a294c" stroke="#38739b" stroke-width="6"/>
+<path d="M82 90h115l-9 62-4 120 10 153-42 0-34-49-17-105-13-118z" fill="url(#curtain)" stroke="#4e91b8" stroke-width="8"/>
+<path d="M678 90H563l9 62 4 120-10 153 42 0 34-49 17-105 13-118z" fill="url(#curtain)" stroke="#4e91b8" stroke-width="8"/>
+<g fill="#4b8bb1"><rect x="95" y="104" width="15" height="30"/><rect x="112" y="152" width="12" height="42"/><rect x="640" y="108" width="14" height="34"/><rect x="625" y="161" width="13" height="44"/></g>
+<!-- desk and books -->
+<rect x="115" y="420" width="540" height="22" fill="#8b684f" stroke="#1d4264" stroke-width="7"/><rect x="145" y="385" width="120" height="16" fill="#d4e5ec"/><rect x="138" y="402" width="133" height="15" fill="#5ca4c4"/><rect x="153" y="367" width="105" height="15" fill="#e7d6b6"/>
+<!-- robot antenna -->
+<g filter="url(#glow)" stroke="#0b476c" stroke-width="8" stroke-linejoin="round"><path d="M324 226l-8-61 20 0 14 64M443 226l12-61 20 0 1 68" fill="#24d9e9"/></g>
+<!-- robot head -->
+<path d="M285 268q0-91 95-91t95 91v91q0 74-95 74t-95-74z" fill="url(#bot)" stroke="#d7e9f4" stroke-width="15"/><path d="M298 274q0-72 82-72t82 72v76q0 63-82 63t-82-63z" fill="#062c4e" stroke="#1d5d83" stroke-width="7"/>
+<!-- narrow vertical eyes, official idle/work expression -->
+<g fill="#8cffff" filter="url(#glow)"><rect x="337" y="294" width="13" height="35" rx="3"/><rect x="410" y="294" width="13" height="35" rx="3"/></g>
+<!-- headphones -->
+<path d="M282 278q-13 5-13 26v42q0 18 19 18h15v-87zM478 278q13 5 13 26v42q0 18-19 18h-15v-87z" fill="#dce8f4" stroke="#7e9eb9" stroke-width="7"/><rect x="273" y="302" width="31" height="43" rx="12" fill="#b9d4e8"/><rect x="456" y="302" width="31" height="43" rx="12" fill="#b9d4e8"/>
+<!-- body/arms -->
+<path d="M323 392q55-27 111 0l18 34H306z" fill="#b8faff" stroke="#0b527c" stroke-width="7"/><path d="M318 409q-35 0-42 24h69" fill="#1abbd5" stroke="#d2faff" stroke-width="6"/>
+<!-- laptop -->
+<path d="M432 356h125l-12 80H416z" fill="#183d62" stroke="#b5e8f4" stroke-width="7"/><path d="M424 438h132l17 10H409z" fill="#a4dce9" stroke="#184e74" stroke-width="5"/><path d="M478 383l15-9 15 9v19h-30z" fill="#8bd9e9"/><circle cx="493" cy="390" r="5" fill="#0a466d"/>
+<!-- lamp -->
+<path d="M544 193l27 54" stroke="#1c3855" stroke-width="9"/><path d="M535 185q42-28 68 11l-50 30z" fill="#ffc75e" stroke="#173d5c" stroke-width="7"/><path d="M542 224l40 0 25 37h-93z" fill="#ffe4a4" opacity=".3"/>
+<!-- plant -->
+<g fill="#63a96e" stroke="#245c5d" stroke-width="3"><path d="M590 420q-8-40 15-53 7 31-15 53M594 420q20-43 43-37-11 32-43 37M591 421q-34-29-26-51 31 16 26 51"/></g><rect x="579" y="420" width="31" height="25" fill="#d9c4a2" stroke="#5e7180" stroke-width="4"/>
+<!-- pixel stars -->
+<g fill="#b6f7ff"><path d="M60 170h6v18h-6zM54 176h18v6H54zM696 235h5v15h-5zM691 240h15v5h-15z"/></g>
+</svg>
