@@ -3,7 +3,7 @@ import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = (s) => document.querySelector(s);
-const authView = $('#authView'), appView = $('#appView');
+const landingView = $('#landingView'), authView = $('#authView'), appView = $('#appView');
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
 let conversations = [], friends = [];
 
@@ -22,6 +22,12 @@ function setMode(next) {
   notice('');
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setMode(b.dataset.tab)));
+function showLanding() { landingView.classList.remove('hidden'); authView.classList.add('hidden'); appView.classList.add('hidden'); window.scrollTo(0,0); }
+function showAuthMode(next='login') { landingView.classList.add('hidden'); appView.classList.add('hidden'); authView.classList.remove('hidden'); setMode(next); window.scrollTo(0,0); }
+document.querySelectorAll('[data-open-auth]').forEach(b => b.addEventListener('click', () => showAuthMode(b.dataset.openAuth)));
+$('#backHome').addEventListener('click', showLanding);
+$('#menuToggle').addEventListener('click', () => $('.main-nav').classList.toggle('open'));
+document.querySelectorAll('.main-nav a').forEach(a => a.addEventListener('click', () => $('.main-nav').classList.remove('open')));
 
 $('#authForm').addEventListener('submit', async e => {
   e.preventDefault(); notice('Sebentar, sedang memproses...');
@@ -60,7 +66,7 @@ async function enterApp(currentUser) {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
   if (error) throw error;
   profile = data;
-  authView.classList.add('hidden'); appView.classList.remove('hidden');
+  landingView.classList.add('hidden'); authView.classList.add('hidden'); appView.classList.remove('hidden');
   $('#helloName').textContent = profile.display_name || 'teman';
   $('#myName').textContent = profile.display_name || 'BalBul User';
   $('#myEmail').textContent = user.email || '';
@@ -68,7 +74,7 @@ async function enterApp(currentUser) {
   $('#myAvatar').textContent = (profile.display_name || 'b').slice(0,1).toUpperCase();
   await loadFriends(); await loadConversations();
 }
-function showAuth() { appView.classList.add('hidden'); authView.classList.remove('hidden'); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel); }
+function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel); }
 supabase.auth.onAuthStateChange(async (event, session) => {
   if (event === 'PASSWORD_RECOVERY') { notice('Sesi pemulihan password aktif. Fitur ubah password akan tersedia di pengaturan akun.'); return; }
   if (session?.user && session.user.email_confirmed_at) {
