@@ -8,7 +8,9 @@ Robot pixel art kecil yang melayang di desktop Windows kamu. Tugasnya: nyimpen t
 - 15 ekspresi (idle, happy, reminder, urgent, marah, thinking, working, proud, encourage, wait, sleep, AFK, lembur, error, offline) yang berubah sesuai kondisi tugas
 - To-do list: tambah, edit, hapus, centang selesai
 - Prioritas: Low, Medium, High, Urgent
-- Deadline dan pengingat (tepat waktu, 10 menit, 30 menit, 1 jam, 1 hari sebelumnya, atau waktu bebas)
+- **Tugas** (ada deadline): diingatkan sebelum deadline, dan balBul marah kalau telat
+- **Pengingat biasa** (tanpa deadline), misalnya "17.00 pulang ke MBS" atau "20.00 ke gym": balBul cuma ngingetin dengan santai, tidak pernah marah. Bisa diulang sekali saja, tiap hari, hari kerja, atau tiap minggu
+- Mata & badan balBul bisa mengikuti kursor (aktifkan di Pengaturan)
 - Notifikasi Windows + bubble chat dari balBul, ada tombol **Selesai** dan **Tunda 10 mnt**
 - Ringkasan hari ini (progress selesai / total)
 - Pengaturan: ukuran, transparansi, suara, jam tidur, kata semangat

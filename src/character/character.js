@@ -6,31 +6,100 @@ const SPRITES = [
 ];
 
 const stage = document.getElementById('stage');
+const wrap = document.getElementById('char-wrap');
+const body = document.getElementById('body');
 const img = document.getElementById('char');
+const eyeEls = [document.getElementById('eye-0'), document.getElementById('eye-1')];
 const bubble = document.getElementById('bubble');
 const bubbleText = document.getElementById('bubble-text');
 const bubbleActions = document.getElementById('bubble-actions');
+const btnDone = document.getElementById('btn-done');
 let bubbleTimer = null;
-let currentTaskId = null;
+let bubbleInfo = null; // { taskId, kind }
+
+// kondisi tampilan saat ini
+let size = 150;
+let tracking = false;
+let currentState = 'idle';
+let look = { x: 0, y: 0 }; // arah kursor, -1..1
+
+// ---------- gerakan mata & badan mengikuti kursor ----------
+function applyLook() {
+  // badan condong sedikit ke arah kursor
+  wrap.style.transform = tracking
+    ? `translate(${(look.x * size * 0.04).toFixed(1)}px, ${(look.y * size * 0.02).toFixed(1)}px) rotate(${(look.x * 4).toFixed(1)}deg)`
+    : '';
+  // mata (hanya ekspresi yang matanya terlihat utuh)
+  const data = window.EYES && window.EYES[currentState];
+  if (!tracking || !data) return;
+  const r = data.range;
+  const dx = look.x >= 0 ? look.x * r.r : look.x * r.l;
+  const dy = look.y >= 0 ? look.y * r.d : look.y * r.u;
+  eyeEls.forEach((el) => {
+    el.style.transform = `translate(${(dx * size).toFixed(1)}px, ${(dy * size).toFixed(1)}px)`;
+  });
+}
 
 // ---------- ekspresi ----------
 function setState(state) {
-  const s = SPRITES.includes(state) ? state : 'idle';
-  img.src = `../../assets/sprites/${s}.png`;
-  img.className = `st-${s}`;
+  currentState = SPRITES.includes(state) ? state : 'idle';
+  const data = window.EYES && window.EYES[currentState];
+  const useEyes = tracking && !!data;
+  img.src = `../../assets/sprites/${currentState}${useEyes ? '-noeyes' : ''}.png`;
+  body.className = `st-${currentState}`;
+  eyeEls.forEach((el, i) => {
+    const e = useEyes ? data.eyes[i] : null;
+    if (!e) {
+      el.classList.remove('on');
+      return;
+    }
+    el.style.left = `${((e.cx - e.w / 2) * 100).toFixed(2)}%`;
+    el.style.top = `${((e.cy - e.h / 2) * 100).toFixed(2)}%`;
+    el.style.width = `${(e.w * 100).toFixed(2)}%`;
+    el.style.height = `${(e.h * 100).toFixed(2)}%`;
+    el.classList.add('on');
+  });
+  applyLook();
 }
 
+// kedip acak (hanya terlihat kalau mata buatan aktif)
+function scheduleBlink() {
+  setTimeout(() => {
+    eyeEls.forEach((el) => {
+      el.classList.remove('blink');
+      void el.offsetWidth; // restart animasi
+      el.classList.add('blink');
+    });
+    scheduleBlink();
+  }, 2500 + Math.random() * 3500);
+}
+scheduleBlink();
+
+function applySettings(s) {
+  size = s.size;
+  document.documentElement.style.setProperty('--size', `${s.size}px`);
+  stage.style.opacity = String(s.opacity / 100);
+  const was = tracking;
+  tracking = !!s.trackCursor;
+  document.body.classList.toggle('tracking', tracking);
+  if (!tracking) look = { x: 0, y: 0 };
+  if (was !== tracking) setState(currentState);
+  else applyLook();
+}
+
+// ---------- bubble ----------
 function hideBubble() {
   bubble.classList.add('hidden');
   bubbleActions.classList.add('hidden');
-  currentTaskId = null;
+  bubbleInfo = null;
   clearTimeout(bubbleTimer);
 }
 
-function showBubble(text, ttl, taskId) {
+function showBubble(text, ttl, taskId, kind) {
   clearTimeout(bubbleTimer);
   bubbleText.textContent = text;
-  currentTaskId = taskId || null;
+  bubbleInfo = taskId ? { taskId, kind } : null;
+  btnDone.textContent = kind === 'reminder' ? 'Oke' : 'Selesai';
   bubbleActions.classList.toggle('hidden', !taskId);
   bubble.classList.remove('hidden');
   bubbleTimer = setTimeout(hideBubble, ttl);
@@ -59,15 +128,15 @@ function beep() {
 // ---------- event dari main.js ----------
 api.on('character:state', (p) => {
   setState(p.state);
-  if (p.text) showBubble(p.text, p.ttl, p.taskId);
+  if (p.text) showBubble(p.text, p.ttl, p.taskId, p.kind);
   else hideBubble();
   if (p.sound) beep();
 });
-
-api.on('settings-changed', (s) => {
-  document.documentElement.style.setProperty('--size', `${s.size}px`);
-  stage.style.opacity = String(s.opacity / 100);
+api.on('character:cursor', (v) => {
+  look = { x: v.x, y: v.y };
+  applyLook();
 });
+api.on('settings-changed', applySettings);
 
 // ---------- klik tembus: hanya karakter & bubble yang bisa diklik ----------
 let interactive = false;
@@ -112,22 +181,22 @@ img.addEventListener('contextmenu', (e) => {
   api.characterMenu();
 });
 
-// ---------- bubble ----------
+// ---------- tombol di bubble ----------
 bubbleText.addEventListener('click', () => {
   api.openDashboard();
   hideBubble();
 });
-document.getElementById('btn-done').addEventListener('click', () => {
-  if (currentTaskId) api.toggleTask(currentTaskId);
+btnDone.addEventListener('click', () => {
+  if (bubbleInfo) {
+    if (bubbleInfo.kind === 'reminder') api.ackTask(bubbleInfo.taskId);
+    else api.toggleTask(bubbleInfo.taskId);
+  }
   hideBubble();
 });
 document.getElementById('btn-snooze').addEventListener('click', () => {
-  if (currentTaskId) api.snoozeTask(currentTaskId, 10);
+  if (bubbleInfo) api.snoozeTask(bubbleInfo.taskId, 10);
   hideBubble();
 });
 
 setState('idle');
-api.getSettings().then((s) => {
-  document.documentElement.style.setProperty('--size', `${s.size}px`);
-  stage.style.opacity = String(s.opacity / 100);
-});
+api.getSettings().then(applySettings);

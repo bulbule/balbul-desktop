@@ -30,6 +30,12 @@
     <form id="form" autocomplete="off">
       <h2 id="form-title">Tambah Tugas</h2>
 
+      <div class="seg" id="seg">
+        <button type="button" data-kind="task" class="on">Tugas (ada deadline)</button>
+        <button type="button" data-kind="reminder">Pengingat biasa</button>
+      </div>
+      <p id="kind-hint" class="hint"></p>
+
       <label>Judul
         <input id="f-title" type="text" maxlength="200" required placeholder="Contoh: Edit video promosi">
       </label>
@@ -38,35 +44,53 @@
         <textarea id="f-desc" rows="2" maxlength="2000"></textarea>
       </label>
 
-      <div class="row">
-        <label>Prioritas
-          <select id="f-priority">
-            <option value="low">Low</option>
-            <option value="medium" selected>Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </label>
-        <label>Deadline (opsional)
-          <input id="f-deadline" type="datetime-local">
-        </label>
-      </div>
-
-      <label>Ingatkan saya
-        <select id="f-remind">
-          <option value="none">Tidak usah</option>
-          <option value="0">Tepat saat deadline</option>
-          <option value="10">10 menit sebelumnya</option>
-          <option value="30">30 menit sebelumnya</option>
-          <option value="60">1 jam sebelumnya</option>
-          <option value="1440">1 hari sebelumnya</option>
-          <option value="custom">Pilih waktu sendiri...</option>
+      <label>Prioritas
+        <select id="f-priority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
         </select>
       </label>
 
-      <label id="custom-wrap" class="hidden">Waktu pengingat
-        <input id="f-custom" type="datetime-local">
-      </label>
+      <!-- khusus TUGAS -->
+      <div class="group only-task">
+        <label>Deadline (opsional)
+          <input id="f-deadline" type="datetime-local">
+        </label>
+
+        <label>Ingatkan saya
+          <select id="f-remind">
+            <option value="none">Tidak usah</option>
+            <option value="0">Tepat saat deadline</option>
+            <option value="10">10 menit sebelumnya</option>
+            <option value="30">30 menit sebelumnya</option>
+            <option value="60">1 jam sebelumnya</option>
+            <option value="1440">1 hari sebelumnya</option>
+            <option value="custom">Pilih waktu sendiri...</option>
+          </select>
+        </label>
+
+        <label id="custom-wrap" class="hidden">Waktu pengingat
+          <input id="f-custom" type="datetime-local">
+        </label>
+      </div>
+
+      <!-- khusus PENGINGAT BIASA -->
+      <div class="group only-reminder hidden">
+        <label>Ingatkan pada
+          <input id="f-rtime" type="datetime-local">
+        </label>
+
+        <label>Ulangi
+          <select id="f-repeat">
+            <option value="none">Sekali saja</option>
+            <option value="daily">Setiap hari</option>
+            <option value="weekdays">Hari kerja (Senin-Jumat)</option>
+            <option value="weekly">Setiap minggu</option>
+          </select>
+        </label>
+      </div>
 
       <p id="form-error" class="error hidden"></p>
 

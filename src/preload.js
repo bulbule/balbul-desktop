@@ -2,7 +2,7 @@
 // Jembatan aman antara tampilan (HTML) dan "otak" aplikasi (main.js).
 const { contextBridge, ipcRenderer } = require('electron');
 
-const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state'];
+const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor'];
 
 contextBridge.exposeInMainWorld('balbul', {
   // tugas
@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('balbul', {
   toggleTask: (id) => ipcRenderer.invoke('tasks:toggle', id),
   deleteTask: (id) => ipcRenderer.invoke('tasks:delete', id),
   snoozeTask: (id, minutes) => ipcRenderer.invoke('tasks:snooze', id, minutes),
+  ackTask: (id) => ipcRenderer.invoke('tasks:ack', id),
 
   // pengaturan
   getSettings: () => ipcRenderer.invoke('settings:get'),

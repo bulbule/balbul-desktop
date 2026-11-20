@@ -20,6 +20,7 @@ const sprite = (name) => path.join(ROOT, 'assets', 'sprites', `${name}.png`);
 const WIN_W = 340; // lebar jendela karakter
 const BUBBLE_H = 150; // ruang di atas karakter untuk bubble chat
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
+const REPEATS = ['none', 'daily', 'weekdays', 'weekly'];
 
 const DEFAULT_SETTINGS = {
   size: 150, // ukuran karakter (px)
@@ -30,6 +31,7 @@ const DEFAULT_SETTINGS = {
   quietEnd: '06:00',
   encourageEveryMin: 60, // 0 = mati
   autoStart: false,
+  trackCursor: false, // mata & badan balBul mengikuti kursor
   x: null,
   y: null,
 };
@@ -100,16 +102,37 @@ const isoOrNull = (v) => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 };
 const isPast = (iso) => !!iso && Date.parse(iso) <= Date.now();
-const pendingTasks = () => tasks.filter((t) => t.status === 'pending');
+const isReminder = (t) => t.kind === 'reminder';
+// "tugas" = yang punya deadline/dikerjakan; pengingat biasa tidak ikut dihitung
+const pendingTasks = () => tasks.filter((t) => t.status === 'pending' && !isReminder(t));
+
+// jadwal berikutnya untuk pengingat berulang (selalu di masa depan)
+function nextOccurrence(iso, repeat) {
+  const d = new Date(iso);
+  const now = Date.now();
+  let guard = 0;
+  do {
+    d.setDate(d.getDate() + (repeat === 'weekly' ? 7 : 1));
+    if (repeat === 'weekdays') {
+      while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    }
+    guard += 1;
+  } while (d.getTime() <= now && guard < 4000);
+  return d.toISOString();
+}
 
 function addTask(data) {
   const title = String((data && data.title) || '').trim().slice(0, 200);
   if (!title) return null;
   const now = new Date().toISOString();
-  const deadline = isoOrNull(data.deadline);
+  const kind = data.kind === 'reminder' ? 'reminder' : 'task';
+  const deadline = kind === 'reminder' ? null : isoOrNull(data.deadline);
   const reminderAt = isoOrNull(data.reminder_at);
+  if (kind === 'reminder' && !reminderAt) return null; // pengingat wajib punya waktu
   const task = {
     id: crypto.randomUUID(),
+    kind,
+    repeat: kind === 'reminder' && REPEATS.includes(data.repeat) ? data.repeat : 'none',
     title,
     description: String(data.description || '').trim().slice(0, 2000) || null,
     priority: PRIORITIES.includes(data.priority) ? data.priority : 'medium',
@@ -121,7 +144,13 @@ function addTask(data) {
     // penanda lokal: sudah pernah dikasih tahu atau belum
     reminded: isPast(reminderAt),
     overdue_notified: isPast(deadline),
+    snooze_until: null,
   };
+  // pengingat berulang yang waktunya sudah lewat: langsung loncat ke jadwal berikutnya
+  if (task.kind === 'reminder' && task.repeat !== 'none' && task.reminded) {
+    task.reminder_at = nextOccurrence(task.reminder_at, task.repeat);
+    task.reminded = false;
+  }
   tasks.push(task);
   saveTasks();
   setOverride('thinking', 'Oke, dicatat!', 2500);
@@ -134,13 +163,26 @@ function updateTask(id, patch) {
   if (typeof patch.title === 'string' && patch.title.trim()) t.title = patch.title.trim().slice(0, 200);
   if ('description' in patch) t.description = String(patch.description || '').trim().slice(0, 2000) || null;
   if (PRIORITIES.includes(patch.priority)) t.priority = patch.priority;
-  if ('deadline' in patch) {
+  if (patch.kind === 'task' || patch.kind === 'reminder') t.kind = patch.kind;
+  if ('repeat' in patch) t.repeat = REPEATS.includes(patch.repeat) ? patch.repeat : 'none';
+  if (t.kind === 'reminder') {
+    t.deadline = null;
+    t.overdue_notified = true;
+  } else {
+    t.repeat = 'none';
+  }
+  if ('deadline' in patch && t.kind !== 'reminder') {
     t.deadline = isoOrNull(patch.deadline);
     t.overdue_notified = isPast(t.deadline);
   }
   if ('reminder_at' in patch) {
     t.reminder_at = isoOrNull(patch.reminder_at);
     t.reminded = isPast(t.reminder_at);
+    t.snooze_until = null;
+    if (t.kind === 'reminder' && t.repeat !== 'none' && t.reminded && t.reminder_at) {
+      t.reminder_at = nextOccurrence(t.reminder_at, t.repeat);
+      t.reminded = false;
+    }
   }
   t.updated_at = new Date().toISOString();
   saveTasks();
@@ -153,7 +195,7 @@ function toggleTask(id) {
   t.status = t.status === 'done' ? 'pending' : 'done';
   t.updated_at = new Date().toISOString();
   saveTasks();
-  if (t.status === 'done') {
+  if (t.status === 'done' && !isReminder(t)) {
     const left = pendingTasks().length;
     if (left === 0) setOverride('proud', 'Semua tugas beres! Kerja bagus.', 8000, { sound: true });
     else setOverride('happy', `Mantap! Tinggal ${left} tugas lagi.`, 5000, { sound: true });
@@ -171,11 +213,21 @@ function snoozeTask(id, minutes) {
   const t = tasks.find((x) => x.id === id);
   const m = Math.min(Math.max(Number(minutes) || 10, 1), 1440);
   if (!t) return null;
-  t.reminder_at = new Date(Date.now() + m * 60000).toISOString();
-  t.reminded = false;
+  t.snooze_until = new Date(Date.now() + m * 60000).toISOString();
   t.updated_at = new Date().toISOString();
   saveTasks();
   setOverride('thinking', `Oke, aku ingatkan lagi ${m} menit lagi.`, 4000);
+  return t;
+}
+
+// tombol "Oke" pada pengingat: pengingat sekali jalan jadi selesai, yang berulang tetap hidup
+function ackTask(id) {
+  const t = tasks.find((x) => x.id === id);
+  if (!t) return null;
+  t.snooze_until = null;
+  if (t.repeat === 'none' && t.status === 'pending') t.status = 'done';
+  t.updated_at = new Date().toISOString();
+  saveTasks();
   return t;
 }
 
@@ -189,6 +241,7 @@ function sanitizeSettings(p) {
   if ('sound' in p) out.sound = !!p.sound;
   if ('showCharacter' in p) out.showCharacter = !!p.showCharacter;
   if ('autoStart' in p) out.autoStart = !!p.autoStart;
+  if ('trackCursor' in p) out.trackCursor = !!p.trackCursor;
   if ('encourageEveryMin' in p) out.encourageEveryMin = num(p.encourageEveryMin, 0, 240);
   if ('quietStart' in p && time(p.quietStart)) out.quietStart = p.quietStart;
   if ('quietEnd' in p && time(p.quietEnd)) out.quietEnd = p.quietEnd;
@@ -218,6 +271,7 @@ function applySettings(patch) {
     app.setLoginItemSettings({ openAtLogin: settings.autoStart });
   }
   broadcast('settings-changed', settings);
+  updateCursorPolling();
   refreshState(true);
   if (tray) tray.setContextMenu(buildMenu());
   return settings;
@@ -272,13 +326,46 @@ function refreshState(force) {
     text: v.text || '',
     sound: !!v.sound && settings.sound,
     taskId: v.taskId || null,
+    kind: v.kind || 'task',
     ttl: v.until ? Math.max(v.until - Date.now(), 1000) : 8000,
   });
 }
 
 function setOverride(state, text, ms, opts = {}) {
-  override = { state, text, until: Date.now() + ms, sound: !!opts.sound, taskId: opts.taskId || null };
+  override = {
+    state, text, until: Date.now() + ms, sound: !!opts.sound, taskId: opts.taskId || null, kind: opts.kind || 'task',
+  };
   refreshState(true);
+}
+
+// ---------------------------------------------------------------- mata ikut kursor
+let cursorTimer = null;
+let lastLook = { x: 99, y: 99 };
+
+function sendCursor() {
+  if (!charWin || charWin.isDestroyed() || !charWin.isVisible()) return;
+  const p = screen.getCursorScreenPoint();
+  const b = charWin.getBounds();
+  const cx = b.x + b.width / 2; // titik tengah kepala karakter
+  const cy = b.y + b.height - settings.size * 0.5;
+  const R = 300; // jarak (px) sampai mata mentok ke pojok
+  const nx = Math.max(-1, Math.min(1, (p.x - cx) / R));
+  const ny = Math.max(-1, Math.min(1, (p.y - cy) / R));
+  if (Math.abs(nx - lastLook.x) < 0.02 && Math.abs(ny - lastLook.y) < 0.02) return;
+  lastLook = { x: nx, y: ny };
+  charWin.webContents.send('character:cursor', { x: +nx.toFixed(3), y: +ny.toFixed(3) });
+}
+
+function updateCursorPolling() {
+  const want = settings.trackCursor && settings.showCharacter && charWin && !charWin.isDestroyed();
+  if (want && !cursorTimer) {
+    cursorTimer = setInterval(sendCursor, 50);
+  } else if (!want && cursorTimer) {
+    clearInterval(cursorTimer);
+    cursorTimer = null;
+    lastLook = { x: 99, y: 99 };
+    if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:cursor', { x: 0, y: 0 });
+  }
 }
 
 // ---------------------------------------------------------------- notifikasi + penjadwal
@@ -301,6 +388,13 @@ function deadlineText(t) {
 }
 
 function fireReminder(t) {
+  if (isReminder(t)) {
+    // pengingat biasa: santai, bukan deadline
+    const jam = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    notify(`Pengingat: ${t.title}`, t.description || `Sekarang jam ${jam}`);
+    setOverride('reminder', `Pengingat: ${t.title}`, 20000, { sound: true, taskId: t.id, kind: 'reminder' });
+    return;
+  }
   const soon = t.deadline && Date.parse(t.deadline) - Date.now() < 60 * 60000;
   const state = t.priority === 'urgent' || soon ? 'urgent' : 'reminder';
   notify(`Pengingat: ${t.title}`, t.deadline ? `Deadline ${deadlineText(t)}` : 'Jangan lupa ya!');
@@ -328,11 +422,21 @@ function tick() {
   for (const t of tasks) {
     if (t.status !== 'pending') continue;
     if (t.reminder_at && !t.reminded && Date.parse(t.reminder_at) <= now) {
-      t.reminded = true;
+      if (isReminder(t) && t.repeat !== 'none') {
+        t.reminder_at = nextOccurrence(t.reminder_at, t.repeat); // jadwal berikutnya
+        t.reminded = false;
+      } else {
+        t.reminded = true;
+      }
       changed = true;
       fireReminder(t);
     }
-    if (t.deadline && !t.overdue_notified && Date.parse(t.deadline) < now) {
+    if (t.snooze_until && Date.parse(t.snooze_until) <= now) {
+      t.snooze_until = null;
+      changed = true;
+      fireReminder(t);
+    }
+    if (!isReminder(t) && t.deadline && !t.overdue_notified && Date.parse(t.deadline) < now) {
       t.overdue_notified = true;
       changed = true;
       fireOverdue(t);
@@ -391,6 +495,7 @@ function createCharacterWindow() {
   });
   charWin.webContents.on('did-finish-load', () => {
     charWin.webContents.send('settings-changed', settings);
+    updateCursorPolling();
     refreshState(true);
     setTimeout(() => {
       const n = pendingTasks().length;
@@ -467,6 +572,7 @@ ipcMain.handle('tasks:update', (_e, id, patch) => updateTask(id, patch));
 ipcMain.handle('tasks:toggle', (_e, id) => toggleTask(id));
 ipcMain.handle('tasks:delete', (_e, id) => deleteTask(id));
 ipcMain.handle('tasks:snooze', (_e, id, minutes) => snoozeTask(id, minutes));
+ipcMain.handle('tasks:ack', (_e, id) => ackTask(id));
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => applySettings(patch));
 

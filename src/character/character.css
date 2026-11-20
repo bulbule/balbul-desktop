@@ -20,14 +20,45 @@ html, body {
   align-items: center;
 }
 
-#char {
+/* pembungkus: dipakai untuk badan yang condong ke arah kursor */
+#char-wrap {
+  position: relative;
   width: var(--size);
   height: var(--size);
+  transform-origin: 50% 100%;
+  transition: transform 0.14s ease-out;
+}
+
+#body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+#char {
+  display: block;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
   transform-origin: 50% 100%;
   cursor: grab;
   -webkit-user-drag: none;
 }
+
+/* mata buatan (dipakai saat mode "ikuti kursor" aktif) */
+.eye {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  background: #aaf7f8;
+  border-radius: 45%;
+  box-shadow: 0 0 6px 1px rgba(53, 224, 255, 0.75);
+  transition: transform 0.1s ease-out;
+}
+.eye.on { display: block; }
+.eye.blink { animation: blink 0.16s ease-in-out; }
+@keyframes blink { 0%, 100% { scale: 1 1; } 50% { scale: 1 0.1; } }
 #char:active { cursor: grabbing; }
 
 /* ---------- bubble chat ---------- */
@@ -85,6 +116,7 @@ html, body {
 @keyframes glitch  { 0%, 90%, 100% { transform: translateX(0); } 92% { transform: translateX(-5px); } 95% { transform: translateX(5px); } 97% { transform: translateX(-2px); } }
 
 .st-idle      { animation: bob 2.4s ease-in-out infinite; }
+.tracking .st-idle { animation: none; } /* mode ikuti kursor: balBul diam, cuma mata & badan yang bergerak */
 .st-happy     { animation: hop 0.9s ease-in-out infinite; }
 .st-reminder  { animation: wiggle 0.7s ease-in-out infinite; }
 .st-urgent    { animation: shake 0.45s linear infinite; }
