@@ -24,7 +24,31 @@
     <img id="side-sprite" src="../../assets/sprites/idle.png" alt="" class="side-sprite">
   </aside>
 
-  <main id="main"></main>
+  <section id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <img src="../../assets/sprites/idle.png" alt="" class="auth-mascot">
+      <div class="auth-brand">balBul</div>
+      <h1 id="auth-title">Selamat datang kembali!</h1>
+      <p class="auth-lead">Masuk untuk menyinkronkan ruang produktifmu.</p>
+      <form id="auth-form" autocomplete="on">
+        <label id="auth-name-wrap" class="hidden">Nama tampilan<input id="auth-name" type="text" maxlength="40" placeholder="Nama kamu" autocomplete="name"></label>
+        <label>Email<input id="auth-email" type="email" required autocomplete="email" placeholder="nama@email.com"></label>
+        <label>Password<input id="auth-password" type="password" required minlength="8" autocomplete="current-password" placeholder="Minimal 8 karakter"></label>
+        <p id="auth-message" class="auth-message" aria-live="polite"></p>
+        <button id="auth-submit" class="add-btn" type="submit">Masuk ke balBul</button>
+      </form>
+      <div class="auth-links">
+        <button id="auth-toggle" class="text-btn" type="button">Belum punya akun? Daftar</button>
+        <button id="auth-forgot" class="text-btn" type="button">Lupa password?</button>
+      </div>
+      <p class="auth-foot">Akun balBul · Email wajib diverifikasi</p>
+    </div>
+  </section>
+
+  <div id="app-shell" class="app-shell hidden">
+    <main id="main"></main>
+    <footer class="account-bar"><span id="account-label">Belum masuk</span><button id="auth-signout" class="text-btn" type="button">Keluar akun</button></footer>
+  </div>
 
   <dialog id="dlg">
     <form id="form" autocomplete="off">
@@ -101,6 +125,7 @@
     </form>
   </dialog>
 
+  <script type="module" src="auth.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
