@@ -235,3 +235,54 @@ body:not(.authenticated) #sidebar { display: none; }
 .text-btn { padding: 4px 0; color: var(--accent); background: none; border: 0; font: inherit; font-size: 12px; cursor: pointer; }
 .text-btn:hover { text-decoration: underline; }
 .auth-foot { margin: 20px 0 0; color: var(--muted); font-size: 11px; }
+
+
+/* ---------- Friend System & Realtime Chat ---------- */
+.cloud-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 18px; margin: 0 0 16px;
+}
+.cloud-card h2 { margin: 0 0 14px; font-size: 16px; }
+.cloud-muted, .cloud-person-info small, .chat-conversation small { color: var(--muted); }
+.cloud-code { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.cloud-code strong { color:var(--accent); font-size:22px; letter-spacing:1px; }
+.cloud-add-form { display:flex; gap:10px; }
+.cloud-add-form input, .desktop-message-form input {
+  flex:1; min-width:0; padding:11px 12px; color:var(--text);
+  background:var(--bg); border:1px solid var(--line); border-radius:9px; font:inherit;
+}
+.cloud-btn {
+  padding:10px 14px; border:1px solid var(--accent); border-radius:9px;
+  color:#05232d; background:var(--accent); font:inherit; font-weight:700; cursor:pointer;
+}
+.cloud-btn.ghost { color:var(--text); background:transparent; border-color:var(--line); }
+.cloud-btn.small { padding:7px 10px; font-size:12px; }
+.cloud-columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.cloud-list { display:flex; flex-direction:column; gap:8px; }
+.cloud-person { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+.cloud-person:last-child { border-bottom:0; }
+.cloud-avatar { width:36px; height:36px; flex:none; display:grid; place-items:center; border-radius:50%; color:#05232d; background:var(--accent); font-weight:800; }
+.cloud-person-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.cloud-person-info small { font-size:11px; }
+.cloud-empty { padding:22px; color:var(--muted); text-align:center; border:1px dashed var(--line); border-radius:10px; }
+.cloud-notice { min-height:18px; margin:0 0 10px; color:var(--ok); font-size:12px; }
+.cloud-notice.error { color:var(--danger); }
+.desktop-chat-layout { display:grid; grid-template-columns:260px minmax(0,1fr); gap:14px; height:calc(100% - 90px); min-height:400px; }
+.chat-conversation-list, .chat-pane { min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden; }
+.chat-conversation-list { padding:8px; overflow-y:auto; }
+.chat-conversation { width:100%; display:flex; align-items:center; gap:10px; padding:10px; color:var(--text); text-align:left; background:transparent; border:1px solid transparent; border-radius:10px; cursor:pointer; }
+.chat-conversation.selected, .chat-conversation:hover { background:var(--panel-2); border-color:var(--line); }
+.chat-conversation > span:last-child { display:flex; flex-direction:column; gap:3px; }
+.chat-conversation small { font-size:11px; }
+.chat-pane { display:flex; flex-direction:column; }
+.chat-pane-head { padding:14px 16px; border-bottom:1px solid var(--line); }
+.desktop-messages { flex:1; min-height:0; display:flex; flex-direction:column; gap:9px; padding:16px; overflow-y:auto; }
+.desktop-message { max-width:75%; align-self:flex-start; padding:9px 12px; color:var(--text); background:var(--panel-2); border:1px solid var(--line); border-radius:12px 12px 12px 3px; overflow-wrap:anywhere; }
+.desktop-message.mine { align-self:flex-end; color:#05232d; background:var(--accent); border-color:transparent; border-radius:12px 12px 3px 12px; }
+.desktop-message time { display:block; margin-top:5px; opacity:.65; text-align:right; font-size:10px; }
+.desktop-message-form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); }
+.chat-placeholder { margin:auto; width:80%; }
+@media (max-width: 760px) {
+  .cloud-columns { grid-template-columns:1fr; }
+  .desktop-chat-layout { grid-template-columns:190px minmax(0,1fr); }
+}
