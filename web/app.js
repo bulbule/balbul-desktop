@@ -6,6 +6,7 @@ const $ = (s) => document.querySelector(s);
 const landingView = $('#landingView'), authView = $('#authView'), appView = $('#appView');
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
 let conversations = [], friends = [];
+const openingDirectIds = new Set();
 
 async function explainNetworkFailure() {
   if (!navigator.onLine) return 'Koneksi internet browser sedang offline. Sambungkan internet lalu coba lagi.';
@@ -128,7 +129,7 @@ async function loadFriends() {
   $('#friendsList').replaceChildren(...friends.map(p=>friendRow(p)));
   $('#requestCount').textContent=reqs?.length||0; $('#requestCount').classList.toggle('hidden',!reqs?.length);
 }
-function friendRow(p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small></small></div><button class="ghost">Chat</button>';row.querySelector('.avatar').textContent=(p.display_name||'b')[0].toUpperCase();row.querySelector('strong').textContent=p.display_name||'Teman';row.querySelector('small').textContent=p.username?'@'+p.username:p.friend_code;row.querySelector('button').onclick=()=>openDirect(p);return row;}
+function friendRow(p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small></small></div><button class="ghost chat-action" type="button">Chat</button>';row.querySelector('.avatar').textContent=(p.display_name||'b')[0].toUpperCase();row.querySelector('strong').textContent=p.display_name||'Teman';row.querySelector('small').textContent=p.username?'@'+p.username:p.friend_code;const button=row.querySelector('button');button.onclick=()=>openDirect(p,button);return row;}
 function friendRequestRow(req,p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Ingin berteman</small></div><div class="friend-actions"><button class="accept">Terima</button><button class="reject">Tolak</button></div>';row.querySelector('.avatar').textContent=(p?.display_name||'?')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||'Pengguna balBul';row.querySelector('.accept').onclick=()=>respondRequest(req,p,true);row.querySelector('.reject').onclick=()=>respondRequest(req,p,false);return row;}
 async function respondRequest(req,p,accept){let error;if(accept){({error}=await supabase.rpc('accept_friend_request',{p_request_id:req.id}));}else{({error}=await supabase.from('friend_requests').update({status:'rejected',responded_at:new Date().toISOString()}).eq('id',req.id));}if(error)return alert(error.message);await loadFriends();if(accept&&p)await openDirect(p);}
 $('#friendForm').addEventListener('submit',async e=>{e.preventDefault();const code=$('#friendCode').value.trim().toUpperCase();const {data:target,error}=await supabase.from('profiles').select('id,display_name,friend_code').eq('friend_code',code).maybeSingle();if(error)return alert(error.message);if(!target)return alert('Kode teman tidak ditemukan.');if(target.id===user.id)return alert('Itu kode kamu sendiri 😄');const {error:err}=await supabase.from('friend_requests').insert({sender_id:user.id,receiver_id:target.id});if(err)return alert(err.code==='23505'?'Permintaan sudah pernah dikirim.':err.message);$('#friendCode').value='';alert('Permintaan pertemanan dikirim!');});
@@ -136,7 +137,7 @@ $('#friendForm').addEventListener('submit',async e=>{e.preventDefault();const co
 async function loadConversations(){
   const {data: memberships,error}=await supabase.from('conversation_members').select('conversation_id').eq('user_id',user.id);
   if(error)throw error;
-  const ids=(memberships||[]).map(x=>x.conversation_id);
+  const ids=[...new Set((memberships||[]).map(x=>x.conversation_id))];
   if(!ids.length){conversations=[];renderConversations();return;}
   const {data: rows,error:e}=await supabase.from('conversations').select('*').in('id',ids).order('created_at',{ascending:false});
   if(e)throw e;
@@ -146,12 +147,44 @@ async function loadConversations(){
   const {data: people,error:pErr}=otherIds.length?await supabase.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};
   if(pErr)throw pErr;
   const byId=Object.fromEntries((people||[]).map(p=>[p.id,p]));
-  conversations=(rows||[]).map(c=>({...c,other:(members||[]).filter(m=>m.conversation_id===c.id&&m.user_id!==user.id).map(m=>byId[m.user_id]).filter(Boolean)}));
+  const mapped=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(m=>m.conversation_id===conv.id&&m.user_id!==user.id).map(m=>byId[m.user_id]).filter(Boolean)}));
+  // Existing duplicate direct threads are represented by one row per friend.
+  const seen=new Set();
+  conversations=mapped.filter(conv=>{
+    if(conv.kind!=='direct')return true;
+    const otherId=conv.other[0]?.id;
+    if(!otherId)return true;
+    if(seen.has(otherId))return false;
+    seen.add(otherId);return true;
+  });
+  if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   renderConversations();
 }
 function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>';row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
-async function openDirect(p){let existing=conversations.find(c=>c.kind==='direct'&&c.other.some(x=>x.id===p.id));if(existing)return openConversation(existing);const {data:c,error}=await supabase.from('conversations').insert({kind:'direct',created_by:user.id}).select().single();if(error)return alert(error.message);const {error:mErr}=await supabase.from('conversation_members').insert([{conversation_id:c.id,user_id:user.id},{conversation_id:c.id,user_id:p.id}]);if(mErr)return alert(mErr.message);await loadConversations();const created=conversations.find(x=>x.id===c.id);if(created)await openConversation(created);}
-async function openConversation(c){activeConversation=c;$('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();renderConversations();if(messageChannel)await supabase.removeChannel(messageChannel);await loadMessages(c.id);messageChannel=supabase.channel('balbul-chat-'+c.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+c.id},payload=>appendMessage(payload.new)).subscribe();}
+async function openDirect(p,button){
+  if(openingDirectIds.has(p.id))return;
+  openingDirectIds.add(p.id);
+  const original=button?.textContent;
+  if(button){button.disabled=true;button.textContent='Membuka…';button.classList.add('is-loading');}
+  try{
+    const {data:conversationId,error}=await supabase.rpc('open_direct_conversation',{p_friend_id:p.id});
+    if(error)throw error;
+    await loadConversations();
+    const conversation=conversations.find(x=>x.id===conversationId)||conversations.find(x=>x.kind==='direct'&&x.other.some(y=>y.id===p.id));
+    if(conversation)await openConversation(conversation);
+  }catch(err){alert(err.message||'Gagal membuka chat.');}
+  finally{openingDirectIds.delete(p.id);if(button){button.disabled=false;button.textContent=original||'Chat';button.classList.remove('is-loading');}}
+}
+async function openConversation(c){activeConversation=c;$('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}renderConversations();if(messageChannel)await supabase.removeChannel(messageChannel);await loadMessages(c.id);messageChannel=supabase.channel('balbul-chat-'+c.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+c.id},payload=>appendMessage(payload.new)).subscribe();}
+async function leaveCurrentConversation(){
+  if(!activeConversation||!confirm('Hapus chat ini dari daftar kamu? Riwayat pesan temanmu tidak akan dihapus.'))return;
+  const id=activeConversation.id;
+  const {error}=await supabase.from('conversation_members').delete().eq('conversation_id',id).eq('user_id',user.id);
+  if(error){alert(error.message);return;}
+  if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}
+  activeConversation=null;$('#activeChat').classList.add('hidden');$('#emptyChat').classList.remove('hidden');
+  await loadConversations();
+}
 async function loadMessages(id){const {data,error}=await supabase.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);if(error)return alert(error.message);$('#messages').replaceChildren();(data||[]).forEach(appendMessage);$('#messages').scrollTop=$('#messages').scrollHeight;}
 function appendMessage(m){if(!activeConversation||m.conversation_id!==activeConversation.id)return;if($('#messages').querySelector('[data-id="'+m.id+'"]'))return;const el=document.createElement('div');el.className='bubble'+(m.sender_id===user.id?' mine':'');el.dataset.id=m.id;const body=document.createElement('div');body.textContent=m.body;const time=document.createElement('time');time.textContent=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});el.append(body,time);$('#messages').append(el);$('#messages').scrollTop=$('#messages').scrollHeight;}
 $('#messageForm').addEventListener('submit',async e=>{e.preventDefault();if(!activeConversation)return;const body=$('#messageInput').value.trim();if(!body)return;$('#messageInput').value='';const {error}=await supabase.from('messages').insert({conversation_id:activeConversation.id,sender_id:user.id,body});if(error){$('#messageInput').value=body;alert(error.message);}});
