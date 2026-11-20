@@ -20,6 +20,18 @@ let friendRows = [], incomingRequests = [], conversations = [], activeConversati
 let sharedTasks = [], taskMembersById = {};
 const openingDirectIds = new Set();
 let realtimeChannels = [];
+let unreadChats = {}, soundEnabled = localStorage.getItem('balbul-chat-sound') !== 'off';
+const seenMessageIds = new Set();
+function unreadStorageKey(){return 'balbul-unread-'+(cloudUser?.id||'guest');}
+function loadUnreadChats(){try{unreadChats=JSON.parse(localStorage.getItem(unreadStorageKey())||'{}')||{};}catch(_){unreadChats={};}}
+function saveUnreadChats(){localStorage.setItem(unreadStorageKey(),JSON.stringify(unreadChats));}
+function updateChatUnread(id,on){if(on)unreadChats[id]=true;else delete unreadChats[id];saveUnreadChats();if(view==='chat')renderChatView();updateChatNavDot();}
+function updateChatNavDot(){const nav=$('#nav [data-view="chat"]');if(!nav)return;let dot=nav.querySelector('.unread-dot');const has=Object.keys(unreadChats).length>0;if(has&&!dot){dot=h('i',{class:'unread-dot','aria-label':'Pesan belum dibaca'});nav.append(dot);}else if(!has&&dot)dot.remove();}
+let audioContext=null;
+function playIncomingSound(){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext ||= new Ctx();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.setValueAtTime(880,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(660,audioContext.currentTime+.12);gain.gain.setValueAtTime(.0001,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.08,audioContext.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.2);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.21);}catch(_){}}
+function toggleChatSound(){soundEnabled=!soundEnabled;localStorage.setItem('balbul-chat-sound',soundEnabled?'on':'off');updateSoundButton();if(soundEnabled)playIncomingSound();}
+function updateSoundButton(){const b=$('#desktop-chat-sound');if(b){b.textContent=soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati';b.classList.toggle('sound-off',!soundEnabled);b.setAttribute('aria-pressed',String(soundEnabled));}}
+function receiveDesktopIncoming(message){if(!message?.id||seenMessageIds.has(message.id))return;seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);if(message.sender_id===cloudUser?.id)return;if(activeConversation?.id===message.conversation_id){appendCloudMessage(message);return;}updateChatUnread(message.conversation_id,true);playIncomingSound();}
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
 function h(tag, props = {}, ...kids) {
@@ -431,9 +443,10 @@ async function loadCloudConversations(){
 function renderChatView(){
   const list=conversations.length?conversations.map(conv=>{
     const person=conv.other[0];
-    return h('button',{class:'chat-conversation'+(activeConversation?.id===conv.id?' selected':''),type:'button',onclick:()=>openCloudConversation(conv)},
+    return h('button',{class:'chat-conversation'+(activeConversation?.id===conv.id?' selected':'')+(unreadChats[conv.id]?' has-unread':''),type:'button',onclick:()=>openCloudConversation(conv)},
       h('span',{class:'cloud-avatar'},(person?.display_name||'B').slice(0,1).toUpperCase()),
-      h('span',{},h('strong',{},person?.display_name||'Percakapan'),h('small',{},'Chat pribadi')));
+      h('span',{},h('strong',{},person?.display_name||'Percakapan'),h('small',{},'Chat pribadi')),
+      unreadChats[conv.id]?h('i',{class:'unread-dot','aria-label':'Pesan belum dibaca'}):null);
   }):[h('div',{class:'cloud-empty'},'Belum ada percakapan. Tambahkan teman dulu.')];
   const pane=h('section',{class:'chat-pane'});
   if(!activeConversation)pane.append(h('div',{class:'cloud-empty chat-placeholder'},'Pilih teman untuk mulai ngobrol.'));
@@ -442,9 +455,10 @@ function renderChatView(){
     h('form',{class:'desktop-message-form',onsubmit:sendDesktopMessage},
       h('input',{id:'desktop-message-input',maxlength:'4000',placeholder:'Tulis pesan...',autocomplete:'off'}),
       h('button',{class:'cloud-btn',type:'submit'},'Kirim')));
-  $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.'))),
+  $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.')),h('button',{id:'desktop-chat-sound',class:'chat-sound-toggle',type:'button',onclick:toggleChatSound,'aria-pressed':String(soundEnabled)},soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati')),
     h('div',{id:'cloud-notice',class:'cloud-notice'}),h('div',{class:'desktop-chat-layout'},h('div',{class:'chat-conversation-list'},list),pane));
   if(activeConversation){startChatRealtime(activeConversation.id);loadCloudMessages(activeConversation.id);}
+  updateSoundButton();
 }
 async function openDirectChat(person,button){
   if(openingDirectIds.has(person.id))return;
@@ -469,7 +483,7 @@ async function leaveDesktopConversation(){
   await loadCloudConversations();
   view='chat';render();cloudNotice('Chat dihapus dari daftar kamu. Riwayat temanmu tetap aman.');
 }
-function openCloudConversation(conv){activeConversation=conv;view='chat';render();}
+function openCloudConversation(conv){activeConversation=conv;updateChatUnread(conv.id,false);view='chat';render();}
 async function loadCloudMessages(id){
   const box=$('#desktop-messages');if(!box)return;
   const {data,error}=await cloud.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);
@@ -502,16 +516,17 @@ function startCloudRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'task_members'},()=>loadSharedTasks().catch(console.error)).subscribe();
   const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>loadCloudConversations().catch(console.error)).subscribe();
-  realtimeChannels.push(friendsChannel,membersChannel,tasksChannel);
+  const messagesChannel=cloud.channel('balbul-all-messages-'+cloudUser.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveDesktopIncoming(payload.new)).subscribe();
+  realtimeChannels.push(friendsChannel,membersChannel,tasksChannel,messagesChannel);
 }
 function startChatRealtime(id){
   const channelName='balbul-desktop-chat-'+id;
   realtimeChannels.filter(ch=>ch.topic==='realtime:'+channelName).forEach(ch=>{cloud.removeChannel(ch);realtimeChannels=realtimeChannels.filter(x=>x!==ch);});
-  const ch=cloud.channel(channelName).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>appendCloudMessage(payload.new)).subscribe();
+  const ch=cloud.channel(channelName).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>receiveDesktopIncoming(payload.new)).subscribe();
   realtimeChannels.push(ch);
 }
 window.addEventListener('balbul-auth-ready',async event=>{
-  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;
+  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;loadUnreadChats();
   try{await Promise.all([loadFriendData(),loadCloudConversations(),loadSharedTasks()]);startCloudRealtime();}
   catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);}
 });
