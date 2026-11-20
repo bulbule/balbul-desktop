@@ -1,71 +1,12 @@
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f5fbfd">
-  <title>balBul — Teman produktivitasmu</title>
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body>
-  <div class="shell">
-    <aside class="rail">
-      <a class="brand" href="#"><span class="bot">b</span><span>bal<span>Bul</span></span></a>
-      <div class="rail-note">YOUR LITTLE<br>PRODUCTIVITY BUDDY</div>
-      <div class="rail-bottom"><span class="live-dot"></span> CLOUD CONNECTED</div>
-    </aside>
-    <main class="main">
-      <section id="authView" class="auth-layout">
-        <div class="hero">
-          <div class="eyebrow">A LITTLE HELP, A LOT OF PROGRESS</div>
-          <h1>Small steps.<br><em>Big things.</em></h1>
-          <p>Atur tugas, temukan teman produktif, dan selesaikan semuanya bareng balBul.</p>
-          <div class="mascot"><div class="antenna"></div><div class="robot"><i></i><i></i><b></b></div><div class="shadow"></div></div>
-          <div class="hero-foot">Your day, a little more organized.</div>
-        </div>
-        <div class="auth-card">
-          <div class="tabs"><button class="tab active" data-tab="login">Masuk</button><button class="tab" data-tab="signup">Daftar</button></div>
-          <h2 id="authTitle">Welcome back!</h2>
-          <p id="authSubtitle" class="muted">Masuk lagi dan lanjutkan progresmu.</p>
-          <form id="authForm">
-            <label id="nameWrap" class="hidden">Nama panggilan<input id="displayName" autocomplete="name" placeholder="Nama kamu"></label>
-            <label>Email<input id="email" type="email" autocomplete="email" required placeholder="nama@email.com"></label>
-            <label>Password<input id="password" type="password" minlength="8" autocomplete="current-password" required placeholder="Minimal 8 karakter"></label>
-            <button class="primary wide" id="authSubmit">Masuk ke balBul <span>↗</span></button>
-          </form>
-          <button id="forgotBtn" class="text-btn">Lupa password?</button>
-          <div id="authMessage" class="message" role="status"></div>
-          <div class="fine">Dengan melanjutkan, kamu menyetujui penggunaan balBul secara bertanggung jawab.</div>
-        </div>
-      </section>
-      <section id="appView" class="app-layout hidden">
-        <header class="topbar"><div><div class="eyebrow">YOUR PRODUCTIVITY SPACE</div><h1>Halo, <span id="helloName">teman</span> <span class="wave">✦</span></h1></div><button id="signOut" class="ghost">Keluar</button></header>
-        <div class="workspace">
-          <aside class="sidepanel">
-            <div class="profile"><div class="avatar" id="myAvatar">b</div><div><strong id="myName">BalBul User</strong><small id="myEmail"></small></div></div>
-            <div class="friend-code">KODE TEMAN <strong id="myCode">—</strong><button id="copyCode" title="Salin kode">⧉</button></div>
-            <button class="nav active" data-panel="chats">◉ <span>Pesan</span></button>
-            <button class="nav" data-panel="friends">♧ <span>Teman</span><b id="requestCount" class="count hidden">0</b></button>
-            <div class="side-tip">“Progress, not perfection.”<br><small>— balBul</small></div>
-          </aside>
-          <section class="content">
-            <div id="chatPanel" class="chat-panel">
-              <div class="chat-list"><div class="section-head"><div><div class="eyebrow">YOUR PEOPLE</div><h2>Pesan</h2></div><button id="newChat" class="icon-btn" title="Percakapan baru">＋</button></div><div id="conversationList" class="list"></div></div>
-              <div class="chat-room"><div id="emptyChat" class="empty"><div class="empty-bot">b</div><h3>Mulai obrolan</h3><p>Pilih teman di samping dan kirim pesan pertamamu.</p><button id="emptyNewChat" class="primary">Cari teman</button></div>
-                <div id="activeChat" class="active-chat hidden"><div class="room-head"><div class="avatar small" id="chatAvatar">b</div><div><strong id="chatTitle">Teman</strong><small id="chatStatus">Percakapan balBul</small></div></div><div id="messages" class="messages"></div><form id="messageForm" class="composer"><input id="messageInput" maxlength="4000" placeholder="Tulis pesan..." autocomplete="off" required><button class="primary" aria-label="Kirim">➤</button></form></div>
-              </div>
-            </div>
-            <div id="friendsPanel" class="friends-panel hidden">
-              <div class="section-head"><div><div class="eyebrow">BUILD YOUR CIRCLE</div><h2>Teman</h2></div></div>
-              <div class="add-friend"><div><strong>Tambah teman baru</strong><p class="muted">Masukkan kode teman balBul mereka.</p></div><form id="friendForm"><input id="friendCode" placeholder="BUL-XXXXXX" maxlength="10" required><button class="primary">Kirim permintaan</button></form></div>
-              <div class="friend-columns"><section><h3>Permintaan masuk</h3><div id="incomingList" class="list"></div></section><section><h3>Teman kamu</h3><div id="friendsList" class="list"></div></section></div>
-            </div>
-          </section>
-        </div>
-      </section>
-      <footer>© 2026 balBul · Made to make your days lighter</footer>
-    </main>
-  </div>
-  <script type="module" src="./app.js"></script>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071a37"><meta name="description" content="Meet balBul, your little desktop assistant. Stay on track with tasks, reminders, friends, and realtime chat."><title>balBul — Your Little Desktop Assistant</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet"><link rel="stylesheet" href="./styles.css"></head><body>
+<div id="landingView">
+<header class="site-header"><a class="wordmark" href="#home"><span class="brand-bot">b</span><span>bal<span class="cyan">Bul</span></span><small>DESKTOP ASSISTANT</small></a><nav class="main-nav"><a class="active" href="#home">Home</a><a href="#features">Features</a><a href="#how">How to Use</a><a href="#download">Download</a></nav><div class="header-actions"><button class="sign-in" data-open-auth="login">Sign In</button><button class="create-account" data-open-auth="signup">Create Account</button></div><button class="menu-toggle" id="menuToggle">☰</button></header>
+<main><section class="hero-section" id="home"><div class="moon"></div><div class="hero-inner"><div class="window-art"><img src="./assets/balbul-window.svg" alt="balBul working at a desk behind a cozy blue-curtained window"></div><div class="hero-copy"><span class="eyebrow-pill">MEET YOUR LITTLE DESKTOP BUDDY ✦</span><h1>I think you<br><span>got me!</span><b class="spark">✦</b></h1><h2>Your little desktop assistant.</h2><p>balBul helps you stay on track — reminding you of tasks, little notes, and daily goals right on your desktop. A tiny companion to make your day feel a little lighter.</p><div class="hero-buttons"><a class="button button-light" href="#features">Meet balBul ↓</a><button class="button button-cyan" data-open-auth="signup">▦ &nbsp; Get Started</button></div><div class="hero-checks"><span>✓ Task &amp; Reminder</span><span>✓ Friend System</span><span>✓ Realtime Chat</span></div></div></div><a class="scroll-cue" href="#features"><span>↓</span> SCROLL TO EXPLORE</a><div class="cloud-edge"></div></section>
+<section class="section-wrap features-section" id="features"><div class="section-heading"><b>✣</b><div><h2>What Can <span>balBul</span> Do?</h2><p>A simple yet powerful companion to keep you productive, focused, and connected.</p></div><b>✣</b></div><div class="feature-grid">
+<article class="feature-card"><div class="feature-icon">☑</div><h3>Task &amp; Reminder</h3><p>Keep your tasks, notes, and little reminders in one place.</p></article><article class="feature-card"><div class="feature-icon">▣</div><h3>Desktop Assistant</h3><p>A friendly companion that's always with you on your desktop.</p></article><article class="feature-card"><div class="feature-icon">♟♟</div><h3>Friend System</h3><p>Add friends, share tasks, and work toward goals together.</p></article><article class="feature-card"><div class="feature-icon chat-icon">•••</div><h3>Realtime Chat</h3><p>Stay connected with your friends, anytime with realtime chat.</p></article><article class="feature-card"><div class="feature-icon">▥</div><h3>Productivity Dashboard</h3><p>See your progress, completed tasks, and daily activity.</p></article></div></section>
+<section class="section-wrap how-section" id="how"><div class="section-heading"><b>✣</b><div><h2>How to Use <span>balBul?</span></h2><p>Get started in a few simple steps.</p></div><b>✣</b></div><div class="steps-grid"><article class="step"><div class="step-art"><span class="mini-bot">⋮</span><b>＋</b></div><h3><i>1</i>Create an Account</h3><p>Sign up with your email, verify your account, and get your own Friend ID.</p></article><div class="step-arrow">→</div><article class="step"><div class="step-art"><span class="mini-bot">▦</span><b>↓</b></div><h3><i>2</i>Download &amp; Install</h3><p>Download the balBul installer for Windows and run the setup.</p></article><div class="step-arrow">→</div><article class="step"><div class="step-art"><span class="mini-bot">••</span><b>✓</b></div><h3><i>3</i>Login to balBul</h3><p>Open the app, log in with your account, and your data will sync.</p></article><div class="step-arrow">→</div><article class="step"><div class="step-art"><span class="mini-bot">••</span><span class="mini-bot second">••</span><b>✦</b></div><h3><i>4</i>Connect with Friends</h3><p>Add friends using Friend ID, chat, and share tasks together.</p></article></div></section>
+<section class="download-section" id="download"><div class="sleepy-scene"><div class="curtain-mini"></div><div class="sleepy-bot">⌣　⌣</div><span class="zzz">Z z</span></div><div class="download-copy"><small>YOUR DESKTOP BUDDY IS ALMOST HERE</small><h2>Get <span>balBul</span> for Windows</h2><p>Install balBul in a few clicks and meet your new desktop assistant.</p><button class="button button-cyan" disabled>↓ &nbsp; Download balBul (EXE)</button><label>Windows installer is being prepared. Coming soon!</label></div><div class="download-meta"><strong>▦</strong><div><b>Windows 10 / 11</b><small>Installer coming soon<br>Free to get started</small></div></div></section></main>
+<footer class="site-footer"><div class="footer-brand"><div class="footer-bot">⌣</div><strong>balBul</strong><p>Your Desktop Assistant</p></div><div class="footer-bottom"><span>© 2026 balBul</span><span>Made to make your days lighter ✦</span><a href="#home">Back to top ↑</a></div></footer></div>
+<section id="authView" class="auth-layout hidden"><button class="back-home" id="backHome">← Back to balBul</button><div class="auth-hero"><div class="eyebrow">YOUR LITTLE PRODUCTIVITY BUDDY</div><h1>Small steps.<br><em>Big things.</em></h1><p>Atur tugas, temukan teman produktif, dan selesaikan semuanya bareng balBul.</p><div class="auth-mascot">◉</div><div class="hero-foot">Your day, a little more organized.</div></div><div class="auth-card"><div class="tabs"><button class="tab active" data-tab="login">Masuk</button><button class="tab" data-tab="signup">Daftar</button></div><h2 id="authTitle">Welcome back!</h2><p id="authSubtitle" class="muted">Masuk lagi dan lanjutkan progresmu.</p><form id="authForm"><label id="nameWrap" class="hidden">Nama panggilan<input id="displayName" autocomplete="name" placeholder="Nama kamu"></label><label>Email<input id="email" type="email" autocomplete="email" required placeholder="nama@email.com"></label><label>Password<input id="password" type="password" minlength="8" autocomplete="current-password" required placeholder="Minimal 8 karakter"></label><button class="primary wide" id="authSubmit">Masuk ke balBul <span>↗</span></button></form><button id="forgotBtn" class="text-btn">Lupa password?</button><div id="authMessage" class="message" role="status"></div><div class="fine">Dengan melanjutkan, kamu menyetujui penggunaan balBul secara bertanggung jawab.</div></div></section>
+<section id="appView" class="app-layout hidden"><header class="topbar"><div><div class="eyebrow">YOUR PRODUCTIVITY SPACE</div><h1>Halo, <span id="helloName">teman</span> <span class="wave">✦</span></h1></div><button id="signOut" class="ghost">Keluar</button></header><div class="workspace"><aside class="sidepanel"><div class="profile"><div class="avatar" id="myAvatar">b</div><div><strong id="myName">BalBul User</strong><small id="myEmail"></small></div></div><div class="friend-code">KODE TEMAN <strong id="myCode">—</strong><button id="copyCode">⧉</button></div><button class="nav active" data-panel="chats">◉ <span>Pesan</span></button><button class="nav" data-panel="friends">♧ <span>Teman</span><b id="requestCount" class="count hidden">0</b></button><div class="side-tip">“Progress, not perfection.”</div></aside><section class="content"><div id="chatPanel" class="chat-panel"><div class="chat-list"><div class="section-head"><div><div class="eyebrow">YOUR PEOPLE</div><h2>Pesan</h2></div><button id="newChat" class="icon-btn">＋</button></div><div id="conversationList" class="list"></div></div><div class="chat-room"><div id="emptyChat" class="empty"><div class="empty-bot">b</div><h3>Mulai obrolan</h3><p>Pilih teman di samping dan kirim pesan pertamamu.</p><button id="emptyNewChat" class="primary">Cari teman</button></div><div id="activeChat" class="active-chat hidden"><div class="room-head"><div class="avatar small" id="chatAvatar">b</div><div><strong id="chatTitle">Teman</strong><small id="chatStatus">Percakapan balBul</small></div></div><div id="messages" class="messages"></div><form id="messageForm" class="composer"><input id="messageInput" maxlength="4000" placeholder="Tulis pesan..." autocomplete="off" required><button class="primary">➤</button></form></div></div></div><div id="friendsPanel" class="friends-panel hidden"><div class="section-head"><div><div class="eyebrow">BUILD YOUR CIRCLE</div><h2>Teman</h2></div></div><div class="add-friend"><div><strong>Tambah teman baru</strong><p class="muted">Masukkan kode teman balBul mereka.</p></div><form id="friendForm"><input id="friendCode" placeholder="BUL-XXXXXX" maxlength="10" required><button class="primary">Kirim permintaan</button></form></div><div class="friend-columns"><section><h3>Permintaan masuk</h3><div id="incomingList" class="list"></div></section><section><h3>Teman kamu</h3><div id="friendsList" class="list"></div></section></div></div></section></div></section>
+<script type="module" src="./app.js"></script></body></html>
