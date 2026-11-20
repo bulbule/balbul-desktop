@@ -1,7 +1,7 @@
 'use strict';
 // "Otak" balBul: jendela karakter, dashboard, penyimpanan tugas, dan penjadwal pengingat.
 const {
-  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage,
+  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage, safeStorage,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -52,6 +52,7 @@ let dragStart = null;
 // ---------------------------------------------------------------- penyimpanan (file JSON)
 const tasksPath = () => path.join(app.getPath('userData'), 'tasks.json');
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+const authSessionPath = () => path.join(app.getPath('userData'), 'auth-session.enc');
 
 function readJson(file, fallback, label) {
   try {
@@ -575,6 +576,26 @@ ipcMain.handle('tasks:snooze', (_e, id, minutes) => snoozeTask(id, minutes));
 ipcMain.handle('tasks:ack', (_e, id) => ackTask(id));
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => applySettings(patch));
+
+// Token sesi Supabase disimpan terenkripsi memakai Windows DPAPI melalui safeStorage.
+ipcMain.handle('auth-storage:get', () => {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Penyimpanan aman Windows tidak tersedia.');
+  const file = authSessionPath();
+  if (!fs.existsSync(file)) return null;
+  try { return safeStorage.decryptString(fs.readFileSync(file)); }
+  catch (err) { console.error('Gagal membuka sesi akun:', err); return null; }
+});
+ipcMain.handle('auth-storage:set', (_e, value) => {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('Penyimpanan aman Windows tidak tersedia.');
+  if (typeof value !== 'string' || value.length > 200000) throw new Error('Data sesi tidak valid.');
+  fs.mkdirSync(path.dirname(authSessionPath()), { recursive: true });
+  fs.writeFileSync(authSessionPath(), safeStorage.encryptString(value));
+  return true;
+});
+ipcMain.handle('auth-storage:remove', () => {
+  try { fs.rmSync(authSessionPath(), { force: true }); } catch (_) { /* abaikan */ }
+  return true;
+});
 
 ipcMain.on('char:ignore', (_e, ignore) => {
   if (charWin && !charWin.isDestroyed()) charWin.setIgnoreMouseEvents(!!ignore, { forward: true });
