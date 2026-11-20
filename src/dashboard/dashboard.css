@@ -323,3 +323,13 @@ body:not(.authenticated) #sidebar { display: none; }
 .chat-leave-btn:hover { color:#b64c58; border-color:#e7bfc5; background:#fff7f7; }
 .cloud-btn:disabled { opacity:.65; cursor:wait; }
 @keyframes balbul-spin { to { transform:rotate(360deg); } }
+
+/* Incoming chat indicator and sound preference */
+.chat-sound-toggle { border:1px solid var(--line); border-radius:9px; padding:8px 11px; color:var(--muted); background:var(--panel); font:inherit; font-size:11px; cursor:pointer; }
+.chat-sound-toggle:hover { border-color:var(--accent); color:var(--accent); }
+.chat-sound-toggle.sound-off { opacity:.65; }
+.unread-dot { display:inline-block; width:9px; height:9px; min-width:9px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.13); margin-left:auto; flex:none; }
+#nav [data-view="chat"] { position:relative; }
+#nav [data-view="chat"] .unread-dot { margin-left:auto; }
+.chat-conversation.has-unread { border-color:rgba(34,197,94,.38); background:rgba(34,197,94,.06); }
+.chat-conversation.has-unread strong { font-weight:800; color:#4ade80; }
