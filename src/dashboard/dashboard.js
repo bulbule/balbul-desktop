@@ -17,6 +17,7 @@ let view = 'today';
 let editingId = null;
 let cloud = null, cloudUser = null, cloudProfile = null;
 let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null;
+let sharedTasks = [], taskMembersById = {};
 let realtimeChannels = [];
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
@@ -225,6 +226,7 @@ function render() {
   }
   if (view === 'settings') renderSettingsView();
   else if (view === 'friends') renderFriendsView();
+  else if (view === 'shared') renderSharedTasksView();
   else if (view === 'chat') renderChatView();
   else renderTasksView();
 }
@@ -493,6 +495,97 @@ window.addEventListener('balbul-auth-ready',async event=>{
   try{await Promise.all([loadFriendData(),loadCloudConversations()]);startCloudRealtime();}
   catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);}
 });
+
+
+async function loadSharedTasks(){
+  if(!cloudUser)return;
+  const {data:mine,error:mineError}=await cloud.from('tasks').select('*').eq('owner_id',cloudUser.id).eq('visibility','shared').order('created_at',{ascending:false});
+  if(mineError)throw mineError;
+  const {data:memberships,error:memError}=await cloud.from('task_members').select('task_id,user_id,added_by').eq('user_id',cloudUser.id);
+  if(memError)throw memError;
+  const memberTaskIds=[...new Set((memberships||[]).map(x=>x.task_id))];
+  const other=memberTaskIds.length?await cloud.from('tasks').select('*').in('id',memberTaskIds).eq('visibility','shared'):{data:[],error:null};
+  if(other.error)throw other.error;
+  const byId=new Map([...(mine||[]),...(other.data||[])].map(t=>[t.id,t]));
+  sharedTasks=[...byId.values()].sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+  const ids=sharedTasks.map(t=>t.id);
+  taskMembersById={};
+  if(ids.length){
+    const {data:allMembers,error}=await cloud.from('task_members').select('task_id,user_id,added_by').in('task_id',ids);
+    if(error)throw error;
+    const userIds=[...new Set((allMembers||[]).map(x=>x.user_id))];
+    const {data:people,error:pErr}=userIds.length?await cloud.from('profiles').select('id,display_name').in('id',userIds):{data:[],error:null};
+    if(pErr)throw pErr;
+    const names=Object.fromEntries((people||[]).map(p=>[p.id,p.display_name]));
+    for(const m of allMembers||[])(taskMembersById[m.task_id] ||= []).push({user_id:m.user_id,name:names[m.user_id]||'Teman'});
+  }
+  if(view==='shared')renderSharedTasksView();
+}
+function renderSharedTasksView(){
+  const friendOptions=friendRows.map(p=>h('option',{value:p.id},p.display_name||p.friend_code||'Teman'));
+  const form=h('form',{class:'shared-create-form',onsubmit:async e=>{
+    e.preventDefault();
+    const title=$('#shared-title').value.trim(), friendId=$('#shared-friend').value;
+    if(!title||!friendId)return cloudNotice('Isi judul dan pilih teman dulu.',true);
+    const due=$('#shared-due').value;
+    cloudNotice('Membuat tugas bersama...');
+    try{
+      const {data:task,error}=await cloud.from('tasks').insert({
+        owner_id:cloudUser.id,created_by:cloudUser.id,title,
+        description:$('#shared-description').value.trim()||null,
+        priority:$('#shared-priority').value,
+        due_at:due?new Date(due).toISOString():null,
+        visibility:'shared'
+      }).select().single();
+      if(error)throw error;
+      const {error:memberError}=await cloud.from('task_members').insert({
+        task_id:task.id,user_id:friendId,added_by:cloudUser.id
+      });
+      if(memberError){
+        await cloud.from('tasks').delete().eq('id',task.id);
+        throw memberError;
+      }
+      await loadSharedTasks();
+      cloudNotice('Tugas bersama berhasil dibuat dan dibagikan!');
+      $('#shared-create-form').reset();
+    }catch(err){cloudNotice(err.message||'Gagal membuat tugas bersama.',true);}
+  }});
+  form.id='shared-create-form';
+  form.append(
+    h('input',{id:'shared-title',required:true,maxlength:'200',placeholder:'Contoh: Selesaikan desain brosur'}),
+    h('textarea',{id:'shared-description',rows:'2',maxlength:'2000',placeholder:'Catatan tugas (opsional)'}),
+    h('select',{id:'shared-friend',required:true},h('option',{value:''},'Pilih teman...'),friendOptions),
+    h('select',{id:'shared-priority'},['low','medium','high','urgent'].map(x=>h('option',{value:x},({low:'Low',medium:'Medium',high:'High',urgent:'Urgent'})[x]))),
+    h('input',{id:'shared-due',type:'datetime-local'}),
+    h('button',{class:'cloud-btn',type:'submit'},'Buat & Bagikan'));
+  const cards=sharedTasks.map(task=>{
+    const members=taskMembersById[task.id]||[];
+    const status=h('select',{class:'shared-status',value:task.status,onchange:async e=>{
+      const next=e.target.value;
+      const {error}=await cloud.from('tasks').update({status:next,updated_at:new Date().toISOString(),completed_at:next==='completed'?new Date().toISOString():null}).eq('id',task.id);
+      if(error){cloudNotice(error.message,true);e.target.value=task.status;}else{cloudNotice('Status tugas berhasil disinkronkan.');await loadSharedTasks();}
+    }},[
+      h('option',{value:'pending'},'Belum mulai'),
+      h('option',{value:'in_progress'},'Sedang dikerjakan'),
+      h('option',{value:'completed'},'Selesai'),
+      h('option',{value:'cancelled'},'Dibatalkan')
+    ]);
+    const owner=task.owner_id===cloudUser.id;
+    return h('article',{class:'shared-task-card'},
+      h('div',{class:'shared-task-top'},h('div',{},h('h3',{},task.title),h('p',{class:'cloud-muted'},task.description||'Tidak ada catatan')),
+        h('span',{class:'shared-owner'},owner?'Dibuat kamu':'Dibagikan ke kamu')),
+      h('div',{class:'shared-task-meta'},
+        h('span',{},'Prioritas: '+task.priority),
+        h('span',{},task.due_at?'Deadline: '+new Date(task.due_at).toLocaleString('id-ID'):'Tanpa deadline')),
+      h('div',{class:'shared-task-members'},'Anggota: '+members.map(m=>m.name).join(', ')),
+      h('label',{class:'shared-status-label'},'Status bersama ',status));
+  });
+  $('#main').replaceChildren(
+    h('div',{class:'head'},h('div',{},h('h1',{},'Tugas Bersama'),h('div',{class:'date'},'Kerjakan bareng, progres tersinkron otomatis.'))),
+    h('div',{id:'cloud-notice',class:'cloud-notice'}),
+    h('section',{class:'cloud-card'},h('h2',{},'Buat tugas bersama'),friendRows.length?form:h('p',{class:'cloud-muted'},'Tambahkan teman terlebih dahulu untuk membuat tugas bersama.')),
+    h('section',{class:'cloud-card'},h('h2',{},'Daftar tugas bersama'),cards.length?h('div',{class:'shared-task-list'},cards):h('div',{class:'cloud-empty'},'Belum ada tugas bersama.')));
+}
 
 let dashboardReady = false;
 window.addEventListener('balbul-auth-ready', async () => {
