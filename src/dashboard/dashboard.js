@@ -441,7 +441,7 @@ function renderChatView(){
       h('button',{class:'cloud-btn',type:'submit'},'Kirim')));
   $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.'))),
     h('div',{id:'cloud-notice',class:'cloud-notice'}),h('div',{class:'desktop-chat-layout'},h('div',{class:'chat-conversation-list'},list),pane));
-  if(activeConversation){loadCloudMessages(activeConversation.id);startChatRealtime(activeConversation.id);}
+  if(activeConversation){startChatRealtime(activeConversation.id);loadCloudMessages(activeConversation.id);}
 }
 async function openDirectChat(person){
   try{
@@ -482,7 +482,7 @@ function startCloudRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error)).subscribe();
   const tasksChannel=cloud.channel('balbul-desktop-tasks-'+cloudUser.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>loadSharedTasks().catch(console.error))
-    .on('postgres_changes',{event:'*',schema:'public',table:'task_members',filter:'user_id=eq.'+cloudUser.id},()=>loadSharedTasks().catch(console.error)).subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_members'},()=>loadSharedTasks().catch(console.error)).subscribe();
   const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>loadCloudConversations().catch(console.error)).subscribe();
   realtimeChannels.push(friendsChannel,membersChannel,tasksChannel);
@@ -516,11 +516,12 @@ async function loadSharedTasks(){
   if(ids.length){
     const {data:allMembers,error}=await cloud.from('task_members').select('task_id,user_id,added_by').in('task_id',ids);
     if(error)throw error;
-    const userIds=[...new Set((allMembers||[]).map(x=>x.user_id))];
+    const userIds=[...new Set([...(allMembers||[]).map(x=>x.user_id),...sharedTasks.map(t=>t.owner_id)])];
     const {data:people,error:pErr}=userIds.length?await cloud.from('profiles').select('id,display_name').in('id',userIds):{data:[],error:null};
     if(pErr)throw pErr;
     const names=Object.fromEntries((people||[]).map(p=>[p.id,p.display_name]));
-    for(const m of allMembers||[])(taskMembersById[m.task_id] ||= []).push({user_id:m.user_id,name:names[m.user_id]||'Teman'});
+    for(const task of sharedTasks)(taskMembersById[task.id] ||= []).push({user_id:task.owner_id,name:names[task.owner_id]||'Pemilik',role:'owner'});
+    for(const m of allMembers||[])(taskMembersById[m.task_id] ||= []).push({user_id:m.user_id,name:names[m.user_id]||'Teman',role:'member'});
   }
   if(view==='shared')renderSharedTasksView();
 }
