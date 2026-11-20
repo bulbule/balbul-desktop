@@ -15,6 +15,9 @@ let tasks = [];
 let settings = {};
 let view = 'today';
 let editingId = null;
+let cloud = null, cloudUser = null, cloudProfile = null;
+let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null;
+let realtimeChannels = [];
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
 function h(tag, props = {}, ...kids) {
@@ -221,6 +224,8 @@ function render() {
     btn.classList.toggle('active', btn.dataset.view === view);
   }
   if (view === 'settings') renderSettingsView();
+  else if (view === 'friends') renderFriendsView();
+  else if (view === 'chat') renderChatView();
   else renderTasksView();
 }
 
@@ -342,6 +347,152 @@ api.on('settings-changed', (s) => {
 
 // perbarui label "Telat" tiap 30 detik
 setInterval(() => { if (view !== 'settings' && !dlg.open) render(); }, 30000);
+
+
+function cloudNotice(message, isError = false) {
+  const el = $('#cloud-notice'); if (!el) return;
+  el.textContent = message || ''; el.classList.toggle('error', isError);
+}
+function renderFriendsView() {
+  const code = cloudProfile?.friend_code || '—';
+  const incoming = incomingRequests.length ? incomingRequests.map(req => h('div',{class:'cloud-person'},
+    h('div',{class:'cloud-avatar'},(req.sender?.display_name||'?').slice(0,1).toUpperCase()),
+    h('div',{class:'cloud-person-info'},h('strong',{},req.sender?.display_name||'Pengguna balBul'),h('small',{},'Meminta untuk berteman')),
+    h('button',{class:'cloud-btn small',type:'button',onclick:()=>respondFriendRequest(req,true)},'Terima'),
+    h('button',{class:'cloud-btn ghost small',type:'button',onclick:()=>respondFriendRequest(req,false)},'Tolak')))
+    : [h('div',{class:'cloud-empty'},'Belum ada permintaan pertemanan.')];
+  const friends = friendRows.length ? friendRows.map(p=>h('div',{class:'cloud-person'},
+    h('div',{class:'cloud-avatar'},(p.display_name||'B').slice(0,1).toUpperCase()),
+    h('div',{class:'cloud-person-info'},h('strong',{},p.display_name||'Teman'),h('small',{},p.friend_code||'')),
+    h('button',{class:'cloud-btn small',type:'button',onclick:()=>openDirectChat(p)},'Chat')))
+    : [h('div',{class:'cloud-empty'},'Belum ada teman. Bagikan Friend ID kamu!')];
+  const codeBox=h('div',{class:'cloud-code'},h('strong',{},code),
+    h('button',{class:'cloud-btn',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(code);cloudNotice('Friend ID berhasil disalin.');}catch(_){cloudNotice('Friend ID: '+code,true);}}},'Salin ID'));
+  const form=h('form',{class:'cloud-add-form',onsubmit:async e=>{
+    e.preventDefault();const input=$('#friend-id-input');const friendCode=input.value.trim().toUpperCase();if(!friendCode)return;
+    cloudNotice('Mencari Friend ID...');
+    try{
+      const {data:target,error}=await cloud.from('profiles').select('id,display_name,friend_code').eq('friend_code',friendCode).maybeSingle();
+      if(error)throw error;if(!target)throw new Error('Friend ID tidak ditemukan.');
+      if(target.id===cloudUser.id)throw new Error('Itu Friend ID kamu sendiri 😄');
+      const {error:sendError}=await cloud.from('friend_requests').insert({sender_id:cloudUser.id,receiver_id:target.id});
+      if(sendError)throw new Error(sendError.code==='23505'?'Permintaan sudah pernah dikirim.':sendError.message);
+      input.value='';cloudNotice('Permintaan pertemanan berhasil dikirim.');await loadFriendData();
+    }catch(err){cloudNotice(err.message||'Gagal mengirim permintaan.',true);}
+  }},h('input',{id:'friend-id-input',placeholder:'BUL-XXXXXX',maxlength:'20',autocomplete:'off'}),
+    h('button',{class:'cloud-btn',type:'submit'},'Kirim Permintaan'));
+  $('#main').replaceChildren(
+    h('div',{class:'head'},h('div',{},h('h1',{},'Teman'),h('div',{class:'date'},'Bangun circle produktifmu.'))),
+    h('div',{id:'cloud-notice',class:'cloud-notice'}),
+    h('section',{class:'cloud-card'},h('h2',{},'Friend ID kamu'),codeBox),
+    h('section',{class:'cloud-card'},h('h2',{},'Tambah teman baru'),h('p',{class:'cloud-muted'},'Masukkan Friend ID temanmu.'),form),
+    h('div',{class:'cloud-columns'},
+      h('section',{class:'cloud-card'},h('h2',{},'Permintaan masuk'),h('div',{class:'cloud-list'},incoming)),
+      h('section',{class:'cloud-card'},h('h2',{},'Teman kamu'),h('div',{class:'cloud-list'},friends))));
+}
+async function loadFriendData(){
+  if(!cloudUser)return;
+  const [{data:reqs,error:rErr},{data:links,error:lErr}]=await Promise.all([
+    cloud.from('friend_requests').select('*').eq('receiver_id',cloudUser.id).eq('status','pending'),
+    cloud.from('friendships').select('*').or('user_low.eq.'+cloudUser.id+',user_high.eq.'+cloudUser.id)
+  ]);
+  if(rErr)throw rErr;if(lErr)throw lErr;
+  const ids=[...new Set([...(reqs||[]).map(x=>x.sender_id),...(links||[]).map(x=>x.user_low===cloudUser.id?x.user_high:x.user_low)])];
+  const {data:people,error:pErr}=ids.length?await cloud.from('profiles').select('id,display_name,friend_code').in('id',ids):{data:[],error:null};
+  if(pErr)throw pErr;const byId=Object.fromEntries((people||[]).map(p=>[p.id,p]));
+  incomingRequests=(reqs||[]).map(req=>({...req,sender:byId[req.sender_id]}));
+  friendRows=(links||[]).map(x=>byId[x.user_low===cloudUser.id?x.user_high:x.user_low]).filter(Boolean);
+  if(view==='friends')renderFriendsView();
+}
+async function respondFriendRequest(req,accept){
+  try{
+    if(accept){const {error}=await cloud.rpc('accept_friend_request',{p_request_id:req.id});if(error)throw error;}
+    else{const {error}=await cloud.from('friend_requests').update({status:'rejected',responded_at:new Date().toISOString()}).eq('id',req.id);if(error)throw error;}
+    await loadFriendData();if(accept&&req.sender)await openDirectChat(req.sender);
+  }catch(err){cloudNotice(err.message||'Gagal memproses permintaan.',true);}
+}
+async function loadCloudConversations(){
+  const {data:memberships,error}=await cloud.from('conversation_members').select('conversation_id').eq('user_id',cloudUser.id);
+  if(error)throw error;const ids=[...new Set((memberships||[]).map(x=>x.conversation_id))];
+  if(!ids.length){conversations=[];if(view==='chat')renderChatView();return;}
+  const {data:rows,error:e}=await cloud.from('conversations').select('*').in('id',ids).order('created_at',{ascending:false});if(e)throw e;
+  const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);if(m)throw m;
+  const otherIds=[...new Set((members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id))];
+  const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};if(p)throw p;
+  const byId=Object.fromEntries((people||[]).map(x=>[x.id,x]));
+  conversations=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean)}));
+  if(view==='chat')renderChatView();
+}
+function renderChatView(){
+  const list=conversations.length?conversations.map(conv=>{
+    const person=conv.other[0];
+    return h('button',{class:'chat-conversation'+(activeConversation?.id===conv.id?' selected':''),type:'button',onclick:()=>openCloudConversation(conv)},
+      h('span',{class:'cloud-avatar'},(person?.display_name||'B').slice(0,1).toUpperCase()),
+      h('span',{},h('strong',{},person?.display_name||'Percakapan'),h('small',{},'Chat pribadi')));
+  }):[h('div',{class:'cloud-empty'},'Belum ada percakapan. Tambahkan teman dulu.')];
+  const pane=h('section',{class:'chat-pane'});
+  if(!activeConversation)pane.append(h('div',{class:'cloud-empty chat-placeholder'},'Pilih teman untuk mulai ngobrol.'));
+  else pane.append(h('div',{class:'chat-pane-head'},h('strong',{},activeConversation.other[0]?.display_name||'Chat')),
+    h('div',{id:'desktop-messages',class:'desktop-messages'}),
+    h('form',{class:'desktop-message-form',onsubmit:sendDesktopMessage},
+      h('input',{id:'desktop-message-input',maxlength:'4000',placeholder:'Tulis pesan...',autocomplete:'off'}),
+      h('button',{class:'cloud-btn',type:'submit'},'Kirim')));
+  $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.'))),
+    h('div',{id:'cloud-notice',class:'cloud-notice'}),h('div',{class:'desktop-chat-layout'},h('div',{class:'chat-conversation-list'},list),pane));
+  if(activeConversation){loadCloudMessages(activeConversation.id);startChatRealtime(activeConversation.id);}
+}
+async function openDirectChat(person){
+  try{
+    const existing=conversations.find(x=>x.kind==='direct'&&x.other.some(p=>p.id===person.id));
+    if(existing){activeConversation=existing;view='chat';render();return;}
+    const {data:conv,error}=await cloud.from('conversations').insert({kind:'direct',created_by:cloudUser.id}).select().single();if(error)throw error;
+    const {error:mErr}=await cloud.from('conversation_members').insert([{conversation_id:conv.id,user_id:cloudUser.id},{conversation_id:conv.id,user_id:person.id}]);if(mErr)throw mErr;
+    await loadCloudConversations();activeConversation=conversations.find(x=>x.id===conv.id)||null;view='chat';render();
+  }catch(err){cloudNotice(err.message||'Gagal membuka chat.',true);}
+}
+function openCloudConversation(conv){activeConversation=conv;view='chat';render();}
+async function loadCloudMessages(id){
+  const box=$('#desktop-messages');if(!box)return;
+  const {data,error}=await cloud.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);
+  if(error){cloudNotice(error.message,true);return;}if(!$('#desktop-messages')||activeConversation?.id!==id)return;
+  box.replaceChildren(...(data||[]).map(messageElement));box.scrollTop=box.scrollHeight;
+}
+function messageElement(message){
+  const el=h('div',{class:'desktop-message'+(message.sender_id===cloudUser.id?' mine':'')});
+  el.dataset.messageId=message.id;
+  el.append(h('div',{},message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  return el;
+}
+function appendCloudMessage(message){
+  if(!activeConversation||message.conversation_id!==activeConversation.id)return;
+  const box=$('#desktop-messages');if(!box||box.querySelector('[data-message-id="'+message.id+'"]'))return;
+  box.append(messageElement(message));box.scrollTop=box.scrollHeight;
+}
+async function sendDesktopMessage(e){
+  e.preventDefault();const input=$('#desktop-message-input');const body=input?.value.trim();if(!body||!activeConversation)return;
+  input.value='';const {error}=await cloud.from('messages').insert({conversation_id:activeConversation.id,sender_id:cloudUser.id,body});
+  if(error){input.value=body;cloudNotice(error.message,true);}
+}
+function startCloudRealtime(){
+  realtimeChannels.forEach(ch=>cloud.removeChannel(ch));realtimeChannels=[];
+  const friendsChannel=cloud.channel('balbul-desktop-friends-'+cloudUser.id)
+    .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests',filter:'receiver_id=eq.'+cloudUser.id},()=>loadFriendData().catch(console.error))
+    .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error)).subscribe();
+  const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>loadCloudConversations().catch(console.error)).subscribe();
+  realtimeChannels.push(friendsChannel,membersChannel);
+}
+function startChatRealtime(id){
+  const channelName='balbul-desktop-chat-'+id;
+  realtimeChannels.filter(ch=>ch.topic==='realtime:'+channelName).forEach(ch=>{cloud.removeChannel(ch);realtimeChannels=realtimeChannels.filter(x=>x!==ch);});
+  const ch=cloud.channel(channelName).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>appendCloudMessage(payload.new)).subscribe();
+  realtimeChannels.push(ch);
+}
+window.addEventListener('balbul-auth-ready',async event=>{
+  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;
+  try{await Promise.all([loadFriendData(),loadCloudConversations()]);startCloudRealtime();}
+  catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);}
+});
 
 let dashboardReady = false;
 window.addEventListener('balbul-auth-ready', async () => {
