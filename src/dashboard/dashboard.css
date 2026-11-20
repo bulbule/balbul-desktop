@@ -198,3 +198,40 @@ textarea { resize: vertical; }
 
 .kind { padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); }
 .task .when.past { color: var(--muted); font-style: italic; }
+
+
+/* ---------- akun & login desktop ---------- */
+body:not(.authenticated) #sidebar { display: none; }
+.app-shell { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.app-shell #main { min-height: 0; }
+.account-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 24px; color: var(--muted);
+  border-top: 1px solid var(--line); background: var(--panel);
+  font-size: 12px;
+}
+.auth-screen {
+  flex: 1; display: grid; place-items: center; overflow-y: auto;
+  padding: 28px; background: radial-gradient(ellipse at 50% 25%, #123747 0, var(--bg) 68%);
+}
+.auth-card {
+  width: min(100%, 390px); padding: 28px; text-align: center;
+  background: rgba(15,37,49,.96); border: 1px solid var(--line);
+  border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+}
+.auth-mascot { width: 86px; height: 86px; object-fit: contain; image-rendering: pixelated; }
+.auth-brand { color: var(--accent); font-size: 25px; font-weight: 900; letter-spacing: .5px; }
+.auth-card h1 { margin: 12px 0 6px; font-size: 21px; }
+.auth-lead { margin: 0 0 22px; color: var(--muted); font-size: 13px; }
+#auth-form { padding: 0; text-align: left; gap: 13px; }
+#auth-form input {
+  width: 100%; padding: 11px 12px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+}
+#auth-form .add-btn { margin: 3px 0 0; }
+.auth-message { min-height: 16px; margin: 0; color: var(--ok); font-size: 12px; line-height: 1.5; }
+.auth-message.error { color: var(--danger); }
+.auth-links { display: flex; justify-content: space-between; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
+.text-btn { padding: 4px 0; color: var(--accent); background: none; border: 0; font: inherit; font-size: 12px; cursor: pointer; }
+.text-btn:hover { text-decoration: underline; }
+.auth-foot { margin: 20px 0 0; color: var(--muted); font-size: 11px; }
