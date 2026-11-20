@@ -533,21 +533,14 @@ function renderSharedTasksView(){
     const due=$('#shared-due').value;
     cloudNotice('Membuat tugas bersama...');
     try{
-      const {data:task,error}=await cloud.from('tasks').insert({
-        owner_id:cloudUser.id,created_by:cloudUser.id,title,
-        description:$('#shared-description').value.trim()||null,
-        priority:$('#shared-priority').value,
-        due_at:due?new Date(due).toISOString():null,
-        visibility:'shared'
-      }).select().single();
-      if(error)throw error;
-      const {error:memberError}=await cloud.from('task_members').insert({
-        task_id:task.id,user_id:friendId,added_by:cloudUser.id
+      const {error}=await cloud.rpc('create_shared_task',{
+        p_friend_id:friendId,
+        p_title:title,
+        p_description:$('#shared-description').value.trim()||null,
+        p_priority:$('#shared-priority').value,
+        p_due_at:due?new Date(due).toISOString():null
       });
-      if(memberError){
-        await cloud.from('tasks').delete().eq('id',task.id);
-        throw memberError;
-      }
+      if(error)throw error;
       await loadSharedTasks();
       cloudNotice('Tugas bersama berhasil dibuat dan dibagikan!');
       $('#shared-create-form').reset();
