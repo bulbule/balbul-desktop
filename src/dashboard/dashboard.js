@@ -495,6 +495,7 @@ function messageElement(message){
   const el=h('div',{class:'desktop-message'+(message.sender_id===cloudUser.id?' mine':'')});
   el.dataset.messageId=message.id;
   el.append(h('div',{},message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  if(message.sender_id===cloudUser.id)setMessageSendState(el,'sent');
   return el;
 }
 function setMessageSendState(el,state){
@@ -516,6 +517,10 @@ async function retryDesktopMessage(el,conversationId,body){
 function appendCloudMessage(message){
   if(!activeConversation||message.conversation_id!==activeConversation.id)return;
   const box=$('#desktop-messages');if(!box||box.querySelector('[data-message-id="'+message.id+'"]'))return;
+  if(message.sender_id===cloudUser?.id){
+    const pending=[...box.querySelectorAll('[data-send-state="sending"]')].find(el=>el.firstChild?.textContent===message.body);
+    if(pending){pending.dataset.messageId=message.id;const time=pending.querySelector('time');if(time)time.textContent=new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageSendState(pending,'sent');return;}
+  }
   box.append(messageElement(message));box.scrollTop=box.scrollHeight;
 }
 async function sendDesktopMessage(e){
@@ -535,7 +540,7 @@ async function sendDesktopMessage(e){
     setMessageSendState(el,'failed');
     el.querySelector('.message-send-state').title=error.message||'Periksa koneksi lalu klik untuk mencoba lagi';
     el.querySelector('.message-send-state').style.cursor='pointer';
-    el.querySelector('.message-send-state').addEventListener('click',()=>retryDesktopMessage(el,conversationId,body),{once:true});
+    el.querySelector('.message-send-state').addEventListener('click',()=>retryDesktopMessage(el,conversationId,body));
     cloudNotice('Pesan gagal dikirim. Klik “Gagal terkirim” pada pesan untuk mencoba lagi.',true);
   }finally{if(submit)submit.disabled=false;}
 }
