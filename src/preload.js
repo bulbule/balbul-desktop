@@ -2,7 +2,7 @@
 // Jembatan aman antara tampilan (HTML) dan "otak" aplikasi (main.js).
 const { contextBridge, ipcRenderer } = require('electron');
 
-const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor', 'chat:open-conversation'];
+const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor', 'chat:open-conversation', 'chat:quick-reply', 'character:chat-message'];
 
 contextBridge.exposeInMainWorld('balbul', {
   // penyimpanan sesi akun (terenkripsi oleh main process)
@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('balbul', {
   characterMenu: () => ipcRenderer.send('char:menu'),
   openDashboard: () => ipcRenderer.send('app:open-dashboard'),
   notifyChat: (payload) => ipcRenderer.send('app:notify-chat', payload),
+  sendQuickReply: (payload) => ipcRenderer.send('char:quick-reply', payload),
 
   // event dari main.js
   on: (channel, callback) => {
