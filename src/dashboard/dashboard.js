@@ -540,7 +540,7 @@ async function sendDesktopMessage(e){
     setMessageSendState(el,'failed');
     el.querySelector('.message-send-state').title=error.message||'Periksa koneksi lalu klik untuk mencoba lagi';
     el.querySelector('.message-send-state').style.cursor='pointer';
-    el.querySelector('.message-send-state').addEventListener('click',()=>retryDesktopMessage(el,conversationId,body));
+    el.querySelector('.message-send-state').addEventListener('click',()=>{if(el.dataset.sendState==='failed')retryDesktopMessage(el,conversationId,body);});
     cloudNotice('Pesan gagal dikirim. Klik “Gagal terkirim” pada pesan untuk mencoba lagi.',true);
   }finally{if(submit)submit.disabled=false;}
 }
