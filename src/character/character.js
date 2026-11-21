@@ -16,6 +16,9 @@ const bubbleActions = document.getElementById('bubble-actions');
 const btnDone = document.getElementById('btn-done');
 let bubbleTimer = null;
 let bubbleInfo = null; // { taskId, kind }
+let incomingChat = null;
+const replyForm = document.getElementById('bubble-reply');
+const replyInput = document.getElementById('bubble-reply-input');
 
 // kondisi tampilan saat ini
 let size = 150;
@@ -90,6 +93,8 @@ function applySettings(s) {
 // ---------- bubble ----------
 function hideBubble() {
   bubble.classList.add('hidden');
+  replyForm.classList.add('hidden');
+  incomingChat = null;
   bubbleActions.classList.add('hidden');
   bubbleInfo = null;
   clearTimeout(bubbleTimer);
@@ -101,6 +106,7 @@ function showBubble(text, ttl, taskId, kind) {
   bubbleInfo = taskId ? { taskId, kind } : null;
   btnDone.textContent = kind === 'reminder' ? 'Oke' : 'Selesai';
   bubbleActions.classList.toggle('hidden', !taskId);
+  replyForm.classList.add('hidden');
   bubble.classList.remove('hidden');
   bubbleTimer = setTimeout(hideBubble, Math.max(2500,Math.min(Number(ttl)||8000,30000)));
 }
@@ -137,6 +143,20 @@ api.on('character:cursor', (v) => {
   applyLook();
 });
 api.on('settings-changed', applySettings);
+api.on('character:chat-message', (message) => {
+  incomingChat = message; clearTimeout(bubbleTimer); setState('thinking');
+  bubbleText.textContent = `✉ ${message.sender}: ${message.body}`;
+  bubbleActions.classList.add('hidden'); replyForm.classList.remove('hidden'); bubble.classList.remove('hidden');
+  look = { x: 0, y: -0.85 }; applyLook(); beep();
+  bubbleTimer = setTimeout(hideBubble, 30000);
+});
+replyForm.addEventListener('submit', (event) => {
+  event.preventDefault(); const body = replyInput.value.trim();
+  if (!body || !incomingChat) return;
+  api.sendQuickReply({ conversationId: incomingChat.conversationId, body });
+  replyInput.value = ''; incomingChat = null; replyForm.classList.add('hidden');
+  bubbleText.textContent = 'Balasan dikirim!'; bubbleTimer = setTimeout(hideBubble, 2500);
+});
 
 // ---------- klik tembus: hanya karakter & bubble yang bisa diklik ----------
 let interactive = false;
@@ -149,7 +169,7 @@ document.addEventListener('mousemove', (e) => {
   const el = document.elementFromPoint(e.clientX, e.clientY);
   setInteractive(!!el && (el.id === 'char' || !!el.closest('#bubble')));
 });
-document.addEventListener('mouseleave', () => setInteractive(false));
+document.addEventListener('mouseleave', () => { setInteractive(false); document.body.classList.remove('lifted'); });
 
 // ---------- geser & klik karakter ----------
 let drag = null;
@@ -157,6 +177,7 @@ img.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   img.setPointerCapture(e.pointerId);
   drag = { sx: e.screenX, sy: e.screenY, moved: false };
+  document.body.classList.add('lifted');
 });
 img.addEventListener('pointermove', (e) => {
   if (!drag) return;
@@ -168,11 +189,13 @@ img.addEventListener('pointermove', (e) => {
     api.dragStart();
   }
   api.dragMove(dx, dy);
+  document.body.classList.toggle('facing-left', dx < -2);
 });
 img.addEventListener('pointerup', () => {
   if (!drag) return;
   const { moved } = drag;
   drag = null;
+  document.body.classList.remove('lifted');
   if (moved) api.dragEnd();
   else api.clickCharacter();
 });
