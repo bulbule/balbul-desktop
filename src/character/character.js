@@ -208,9 +208,11 @@ img.addEventListener('contextmenu', (e) => {
 
 // ---------- tombol di bubble ----------
 bubbleText.addEventListener('click', () => {
+  if (incomingChat) { replyInput.focus(); return; }
   api.openDashboard();
   hideBubble();
 });
+replyInput.addEventListener('focus', () => { clearTimeout(bubbleTimer); });
 btnDone.addEventListener('click', () => {
   if (bubbleInfo) {
     if (bubbleInfo.kind === 'reminder') api.ackTask(bubbleInfo.taskId);
