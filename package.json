@@ -12,7 +12,8 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "latest",
-    "electron-builder": "latest"
+    "electron-builder": "latest",
+    "electron-updater": "^6.6.2"
   },
   "build": {
     "appId": "com.balbul.desktop",
@@ -46,6 +47,14 @@
       "createStartMenuShortcut": true,
       "shortcutName": "balBul"
     },
-    "artifactName": "balBul-Setup.${ext}"
+    "artifactName": "balBul-Setup.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "bulbule",
+        "repo": "balbul-desktop",
+        "releaseType": "release"
+      }
+    ]
   }
 }
