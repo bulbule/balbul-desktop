@@ -1,0 +1,190 @@
+/* =========================================================
+   balBul landing page (tampilan saja, tidak ada logika)
+   Sampul = hero-bg.gif · ikon = dipotong dari gambar contoh
+   ========================================================= */
+#landingView{
+  --page:#f4f8fd;--ink:#0c2142;--ink-2:#4a6384;--sea:#0b7fb0;--teal:#14b3c9;
+  --card-line:#e0eaf6;--navy:#071a37;
+  font-family:'DM Sans',sans-serif;background:var(--page);color:var(--ink);
+}
+#landingView img{-webkit-user-drag:none}
+#landingView h1,#landingView h2,#landingView h3,.step h3{font-family:'Plus Jakarta Sans','DM Sans',sans-serif}
+
+/* ---------- header ---------- */
+.site-header{height:72px;padding:0 clamp(20px,6vw,88px);display:flex;align-items:center;justify-content:space-between;gap:24px;background:var(--navy);color:#fff;position:sticky;top:0;z-index:20;border-bottom:1px solid #1d3f66}
+.wordmark{display:flex;align-items:center;gap:10px;font-weight:800;font-size:25px;font-family:'Plus Jakarta Sans','DM Sans',sans-serif}
+.wordmark .cyan{color:var(--cyan)}
+.wordmark small{font:700 8px 'DM Sans',sans-serif;letter-spacing:1px;color:#9db9d4;border-left:1px solid #47617e;padding-left:10px}
+.brand-logo{width:40px;height:auto;image-rendering:auto;filter:drop-shadow(0 0 8px rgba(32,229,240,.45))}
+.main-nav{display:flex;gap:clamp(18px,3vw,42px);height:100%}
+.main-nav a{display:flex;align-items:center;position:relative;font-size:13px;color:#d5e4f5;transition:color .2s}
+.main-nav a:hover{color:#fff}
+.main-nav a.active:after{content:"";height:3px;background:var(--cyan);position:absolute;bottom:0;left:0;right:0}
+.header-actions{display:flex;gap:10px}
+.sign-in,.create-account{border-radius:30px;padding:10px 19px;font-size:12px;font-weight:700;transition:transform .2s,box-shadow .2s}
+.sign-in{color:#fff;background:transparent;border:1px solid #6a86a5}
+.create-account{color:#062449;background:var(--cyan);border:1px solid var(--cyan)}
+.sign-in:hover,.create-account:hover{transform:translateY(-1px)}
+.menu-toggle{display:none;background:none;color:#fff;border:0;font-size:24px}
+
+/* ---------- tombol ---------- */
+.button{display:inline-flex;align-items:center;justify-content:center;gap:12px;padding:13px 22px;border-radius:30px;border:0;font-weight:800;font-size:13px;transition:transform .2s,box-shadow .2s}
+.button:hover{transform:translateY(-2px)}
+.button-light{background:#fff;color:#102c4f}
+.button-cyan{background:linear-gradient(90deg,#27e6f4,#37cdfd);color:#05294d;box-shadow:0 8px 24px rgba(0,217,237,.28)}
+
+/* ---------- hero: sampul GIF ---------- */
+.hero-section{position:relative;overflow:hidden;isolation:isolate;color:#fff;background:#03234f}
+.hero-art{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;object-position:left center;display:block}
+.hero-inner{position:relative;max-width:1440px;margin:auto;min-height:clamp(440px,44vw,670px);display:flex;align-items:center;justify-content:flex-end;padding:56px clamp(24px,4.5vw,72px) 84px}
+.hero-copy{width:min(38vw,500px)}
+.eyebrow-pill{display:inline-flex;border:1px solid rgba(148,186,224,.7);border-radius:30px;padding:8px 13px;color:#d9eaff;font-size:10px;letter-spacing:.7px;background:rgba(5,24,60,.45);backdrop-filter:blur(3px)}
+.hero-copy h1{font-family:'Press Start 2P',monospace!important;font-size:clamp(20px,2.6vw,38px);line-height:1.55;margin:18px 0 14px;text-shadow:0 4px #0a2b5a}
+.hero-copy h1 span{color:var(--cyan)}
+.spark{font:30px 'DM Sans';color:#ffd45c;vertical-align:top;margin-left:8px}
+.hero-copy h2{font-size:clamp(15px,1.4vw,19px);margin:0 0 9px}
+.hero-copy p{font-size:clamp(12px,1vw,14px);line-height:1.75;color:#d1e2f5;margin:0;max-width:445px}
+.hero-buttons{display:flex;gap:13px;margin-top:22px;flex-wrap:wrap}
+.hero-checks{display:flex;gap:17px;flex-wrap:wrap;margin-top:20px;color:#d9efff;font-size:10px}
+.scroll-cue{position:absolute;z-index:3;bottom:46px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:1.5px;color:#d5eaff;display:flex;align-items:center;gap:9px}
+.scroll-cue span{width:24px;height:32px;border:1px solid #b7d9f4;border-radius:14px;display:grid;place-items:center;font-size:17px}
+.cloud-edge{position:absolute;bottom:-1px;left:0;right:0;height:30px;background:
+  radial-gradient(60px 24px at 7% 100%,var(--page) 97%,transparent 100%),
+  radial-gradient(80px 30px at 24% 100%,var(--page) 97%,transparent 100%),
+  radial-gradient(90px 32px at 50% 100%,var(--page) 97%,transparent 100%),
+  radial-gradient(84px 30px at 76% 100%,var(--page) 97%,transparent 100%),
+  radial-gradient(64px 24px at 95% 100%,var(--page) 97%,transparent 100%),
+  linear-gradient(transparent 55%,var(--page) 56%)}
+
+/* ---------- judul seksi ---------- */
+.section-wrap{max-width:1180px;margin:auto;padding:46px clamp(18px,3vw,36px)}
+.section-heading{display:flex;align-items:center;justify-content:center;gap:clamp(12px,2.4vw,26px);text-align:center;margin-bottom:30px}
+.section-heading h2{font-size:clamp(24px,2.6vw,34px);font-weight:800;letter-spacing:-.3px;margin:0 0 8px;color:var(--ink)}
+.section-heading h2 span{color:var(--sea)}
+.section-heading p{margin:0;color:var(--ink-2);font-size:13px}
+.deco{display:block;width:34px;flex:none;color:#12bfdc;fill:currentColor;margin-top:-18px}
+.deco svg{display:block;width:100%;height:auto}
+.deco:last-child{transform:scaleX(-1)}
+
+/* ---------- fitur ---------- */
+.features-section{background:var(--page)}
+.features-section .section-wrap{padding-top:40px;padding-bottom:24px}
+.feature-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.feature-card{position:relative;min-height:210px;padding:22px 14px 24px;text-align:center;border:1px solid var(--card-line);border-radius:26px;background:linear-gradient(180deg,#fff 0%,#f0f6fc 100%);box-shadow:0 14px 26px -16px rgba(28,84,150,.28),inset 0 1px 0 #fff;transition:transform .25s ease,box-shadow .25s ease}
+.feature-card:hover{transform:translateY(-5px);box-shadow:0 20px 30px -16px rgba(28,84,150,.34),inset 0 1px 0 #fff}
+.feature-card img{display:block;height:92px;width:auto;max-width:100%;margin:0 auto 16px;object-fit:contain}
+.feature-card h3{font-size:15px;font-weight:800;margin:0 0 8px;color:var(--ink)}
+.feature-card p{font-size:12px;line-height:1.6;color:var(--ink-2);margin:0 auto;max-width:170px}
+
+/* ---------- cara pakai ---------- */
+.how-section{position:relative;overflow:hidden;background:var(--page)}
+.how-section .section-wrap{position:relative;z-index:1;padding-top:30px;padding-bottom:40px}
+.sky-cloud{position:absolute;top:8px;z-index:0;height:auto;pointer-events:none}
+.sky-cloud-l{left:0;width:clamp(110px,15vw,230px)}
+.sky-cloud-r{right:0;width:clamp(110px,15vw,230px)}
+.steps-grid{display:grid;grid-template-columns:1fr 34px 1fr 34px 1fr 34px 1fr;gap:8px;align-items:start}
+.step{text-align:center;min-width:0}
+.step img{display:block;height:104px;width:auto;max-width:100%;margin:0 auto 14px;object-fit:contain}
+.step h3{display:flex;justify-content:center;align-items:center;gap:8px;font-size:15px;font-weight:800;margin:0 0 9px;white-space:nowrap;color:var(--ink)}
+.step h3 i{font-style:normal;flex:none;width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#1cc6da,#0aa3bf);color:#fff;font:800 13px 'DM Sans',sans-serif}
+.step p{font-size:12px;line-height:1.6;color:var(--ink-2);max-width:210px;margin:0 auto;text-align:left}
+.step-arrow{color:#16a9cc;display:flex;justify-content:center;padding-top:54px}
+.step-arrow svg{width:30px;height:auto}
+
+/* ---------- banner unduh ---------- */
+.download-section{position:relative;width:calc(100% - 36px);max-width:1100px;margin:14px auto 40px;border-radius:28px;overflow:hidden;color:#fff;
+  background:#103260 url(./assets/banner-bg.jpg) left center/cover no-repeat;
+  min-height:clamp(170px,19vw,210px);display:grid;grid-template-columns:36% 1fr auto;align-items:center;gap:0;box-shadow:0 18px 34px -18px rgba(8,37,81,.6)}
+.sleepy-scene{display:none}
+.download-copy{grid-column:2;padding:20px 0 24px;min-width:0}
+.download-copy h2{font-size:clamp(20px,2.2vw,27px);font-weight:800;margin:0 0 9px;letter-spacing:-.2px;color:#fff}
+.download-copy h2 span{color:#21e4f3}
+.download-copy p{font-size:clamp(12px,1.1vw,14px);line-height:1.55;color:#d4e8fa;margin:0 0 16px;max-width:360px}
+.download-copy .button{padding:0 30px;height:50px;font-size:15px;gap:12px;box-shadow:0 10px 26px rgba(0,217,237,.32)}
+.download-copy .button svg{width:20px;height:20px;flex:none}
+.download-meta{grid-column:3;align-self:center;margin:0 clamp(18px,3vw,44px) 0 clamp(14px,2vw,30px);padding:10px 0 10px clamp(18px,2.6vw,34px);border-left:1px solid rgba(180,214,245,.32);display:flex;align-items:center;gap:16px}
+.win-logo{width:40px;height:40px;color:#26e2f2;flex:none}
+.download-meta b,.download-meta small{display:block}
+.download-meta b{font-size:14px;font-weight:700}
+.download-meta small{font-size:12px;color:#c3d9ee;line-height:1.85;margin-top:5px}
+
+/* ---------- footer: lanskap pixel ---------- */
+.site-footer{position:relative;overflow:hidden;text-align:center;background:var(--page) url(./assets/footer-land.png) center bottom/100% auto no-repeat;
+  min-height:clamp(215px,17.8vw,330px);padding-top:clamp(18px,2.2vw,34px)}
+.footer-brand{position:relative;color:var(--ink)}
+.footer-bot{display:block;width:clamp(50px,5.4vw,80px);height:auto;margin:0 auto 4px;filter:drop-shadow(0 4px 6px rgba(20,90,150,.25))}
+.footer-brand strong{display:block;font:800 clamp(26px,2.9vw,38px)/1.1 'Plus Jakarta Sans','DM Sans',sans-serif;letter-spacing:-.5px}
+.footer-brand p{font-size:clamp(11px,1vw,14px);margin:3px 0 0;color:#17304f}
+.footer-bottom{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:1100px;display:flex;justify-content:space-between;gap:12px;padding:9px clamp(18px,3vw,36px);color:#eaf8ff;font-size:10px;text-shadow:0 1px 3px rgba(0,50,100,.7)}
+.footer-bottom a:hover{text-decoration:underline}
+
+/* ---------- tablet ---------- */
+@media(max-width:1000px){
+  .feature-grid{grid-template-columns:repeat(6,1fr)}
+  .feature-card{grid-column:span 2}
+  .feature-card:nth-child(4){grid-column:2/4}
+  .feature-card:nth-child(5){grid-column:4/6}
+  .steps-grid{grid-template-columns:1fr 26px 1fr 26px 1fr 26px 1fr}
+  .step h3{font-size:13px;white-space:normal}
+  .step img{height:88px}
+  .step-arrow{padding-top:44px}
+  .step-arrow svg{width:24px}
+  .download-section{margin:14px 18px 34px}
+}
+@media(max-width:900px){
+  .site-header{padding:0 20px}
+  .main-nav{gap:16px}
+  .main-nav a{font-size:11px}
+  .wordmark small{display:none}
+}
+
+/* ---------- HP ---------- */
+@media(max-width:820px){
+  .hero-art{position:relative;z-index:0;height:clamp(220px,62vw,380px);object-position:12% center;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+  .hero-section{background:linear-gradient(#03234f,#02183a)}
+  .hero-inner{display:block;min-height:0;padding:6px 22px 76px;margin-top:-22px}
+  .hero-copy{width:100%;max-width:520px;margin:0 auto}
+  .scroll-cue{display:none}
+}
+@media(max-width:650px){
+  .site-header{height:64px}
+  .wordmark{font-size:21px}
+  .brand-logo{width:34px}
+  .main-nav{display:none;position:absolute;top:64px;left:0;right:0;height:auto;padding:12px 22px;background:#081d3a;flex-direction:column}
+  .main-nav.open{display:flex}
+  .main-nav a{height:40px}
+  .header-actions{margin-left:auto}
+  .sign-in{padding:8px 12px}
+  .create-account{display:none}
+  .menu-toggle{display:block}
+  .hero-copy h1{font-size:clamp(22px,7vw,34px);margin:12px 0}
+  .hero-copy h2{font-size:16px}
+  .hero-buttons{margin-top:16px}
+  .button{padding:11px 16px;font-size:12px}
+  .hero-checks{font-size:9.5px;gap:10px}
+  .section-wrap{padding:30px 16px}
+  .section-heading{margin-bottom:22px}
+  .section-heading h2{font-size:22px}
+  .section-heading p{font-size:11px}
+  .deco{width:22px;margin-top:-12px}
+  .feature-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .feature-card{min-height:178px;padding:16px 9px 18px;border-radius:20px}
+  .feature-card,.feature-card:nth-child(4),.feature-card:nth-child(5){grid-column:auto}
+  .feature-card:last-child{grid-column:1/-1;max-width:calc(50% - 5px);justify-self:center;width:100%}
+  .feature-card img{height:64px;margin-bottom:12px}
+  .feature-card h3{font-size:13px}
+  .feature-card p{font-size:10.5px}
+  .steps-grid{grid-template-columns:1fr 1fr;gap:26px 10px}
+  .step-arrow{display:none}
+  .step img{height:76px}
+  .step h3{font-size:12px}
+  .step p{font-size:10.5px;padding:0 4px}
+  .download-section{grid-template-columns:1fr;margin:8px 12px 28px;border-radius:22px;background:linear-gradient(#082551,#103260 55%,#154375);text-align:center}
+  .sleepy-scene{display:block;width:min(86%,330px);height:auto;margin:6px auto 4px}
+  .download-copy{grid-column:1;padding:0 18px 8px}
+  .download-copy p{margin:0 auto 14px}
+  .download-copy .button{height:46px;padding:0 22px;font-size:13px}
+  .download-meta{grid-column:1;margin:0 18px 20px;padding:14px 0 0;border-left:0;border-top:1px solid rgba(180,214,245,.28);justify-content:center;text-align:left}
+  .site-footer{min-height:225px;background-size:auto 215px}
+  .footer-bottom{font-size:9px;flex-wrap:wrap;justify-content:center}
+}
