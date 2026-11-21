@@ -497,15 +497,47 @@ function messageElement(message){
   el.append(h('div',{},message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
   return el;
 }
+function setMessageSendState(el,state){
+  if(!el)return;
+  el.dataset.sendState=state;
+  let label=el.querySelector('.message-send-state');
+  if(!label){label=h('small',{class:'message-send-state'});el.append(label);}
+  label.textContent=state==='sending'?'Mengirim…':state==='sent'?'Terkirim':state==='failed'?'Gagal terkirim · klik untuk coba lagi':'';
+  label.className='message-send-state '+state;
+}
+async function retryDesktopMessage(el,conversationId,body){
+  if(!el||el.dataset.sendState==='sending')return;
+  setMessageSendState(el,'sending');
+  const {data,error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}).select().single();
+  if(error){setMessageSendState(el,'failed');cloudNotice('Pesan belum terkirim. Klik label Gagal untuk mencoba lagi.',true);return;}
+  el.dataset.messageId=data.id;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  setMessageSendState(el,'sent');
+}
 function appendCloudMessage(message){
   if(!activeConversation||message.conversation_id!==activeConversation.id)return;
   const box=$('#desktop-messages');if(!box||box.querySelector('[data-message-id="'+message.id+'"]'))return;
   box.append(messageElement(message));box.scrollTop=box.scrollHeight;
 }
 async function sendDesktopMessage(e){
-  e.preventDefault();const input=$('#desktop-message-input');const body=input?.value.trim();if(!body||!activeConversation)return;
-  input.value='';const {error}=await cloud.from('messages').insert({conversation_id:activeConversation.id,sender_id:cloudUser.id,body});
-  if(error){input.value=body;cloudNotice(error.message,true);}
+  e.preventDefault();const input=$('#desktop-message-input');const body=input?.value.trim();if(!body||!activeConversation||!cloudUser)return;
+  const conversationId=activeConversation.id;
+  const box=$('#desktop-messages');const tempId='pending-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  const el=h('div',{class:'desktop-message mine', 'data-message-id':tempId},h('div',{},body),h('time',{},new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  box?.append(el);if(box)box.scrollTop=box.scrollHeight;
+  input.value='';input.focus();setMessageSendState(el,'sending');
+  const submit=e.submitter; if(submit)submit.disabled=true;
+  try{
+    const {data,error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}).select().single();
+    if(error)throw error;
+    el.dataset.messageId=data.id;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    setMessageSendState(el,'sent');
+  }catch(error){
+    setMessageSendState(el,'failed');
+    el.querySelector('.message-send-state').title=error.message||'Periksa koneksi lalu klik untuk mencoba lagi';
+    el.querySelector('.message-send-state').style.cursor='pointer';
+    el.querySelector('.message-send-state').addEventListener('click',()=>retryDesktopMessage(el,conversationId,body),{once:true});
+    cloudNotice('Pesan gagal dikirim. Klik “Gagal terkirim” pada pesan untuk mencoba lagi.',true);
+  }finally{if(submit)submit.disabled=false;}
 }
 let cloudConnectionState='connecting';
 let realtimeStates={};
@@ -517,8 +549,11 @@ function updateCloudConnectionState(){
   const next=!navigator.onLine?'offline':(states.length&&states.every(x=>x==='SUBSCRIBED')?'online':'connecting');
   if(next===cloudConnectionState)return;
   cloudConnectionState=next;
-  const badge=$('#cloud-connection-status');
-  if(badge){badge.className='cloud-connection-status '+next;badge.textContent=next==='online'?'● Online':next==='offline'?'● Offline':'◌ Connecting';}
+  const label=next==='online'?'● Online':next==='offline'?'● Offline':'◌ Connecting';
+  document.querySelectorAll('.cloud-connection-status').forEach(badge=>{
+    badge.className='cloud-connection-status '+next;
+    badge.textContent=label;
+  });
 }
 function scheduleCloudReconnect(){
   if(!cloudUser||!navigator.onLine||reconnectTimer)return;
