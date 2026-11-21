@@ -547,7 +547,6 @@ let cloudSyncBusy=false;
 function updateCloudConnectionState(){
   const states=Object.values(realtimeStates);
   const next=!navigator.onLine?'offline':(states.length&&states.every(x=>x==='SUBSCRIBED')?'online':'connecting');
-  if(next===cloudConnectionState)return;
   cloudConnectionState=next;
   const label=next==='online'?'● Online':next==='offline'?'● Offline':'◌ Connecting';
   document.querySelectorAll('.cloud-connection-status').forEach(badge=>{
