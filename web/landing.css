@@ -303,3 +303,25 @@
   .meta-platform small{display:block;font-size:8px;line-height:1.35;color:#c3d9ee;margin-top:2px}
   .meta-tagline{grid-column:1/-1;text-align:center;font-size:9px;margin:0;padding-top:8px;border-top:1px solid rgba(190,220,250,.16)}
 }
+
+/* Desktop download banner aligned to the approved two-platform artwork */
+.download-section{display:grid;grid-template-columns:minmax(250px,34%) minmax(360px,1fr) minmax(230px,25%);align-items:center;min-height:300px;padding:20px 24px 20px 0;border-radius:28px;background:radial-gradient(ellipse at 15% 100%,#1765a4 0%,transparent 48%),linear-gradient(110deg,#071f49,#10396f 58%,#08264f);box-shadow:0 18px 34px -18px rgba(8,37,81,.6)}
+.download-section .sleepy-scene{display:block;position:absolute;left:0;bottom:0;width:43%;height:100%;object-fit:contain;object-position:left bottom;z-index:1}
+.download-copy{grid-column:2;grid-row:1;padding:24px 18px 24px 0;z-index:2}
+.download-copy h2{font-size:clamp(25px,2.8vw,38px);letter-spacing:-.8px}
+.download-copy p{max-width:560px;font-size:15px}
+.download-platforms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.download-copy .platform-button{height:66px;border-radius:40px;padding:0 16px;display:flex;justify-content:space-between;gap:10px;box-shadow:0 9px 22px #001b3d55}
+.platform-button span{display:flex;flex-direction:column;align-items:flex-start;line-height:1.1}
+.platform-button small{font-size:11px;font-weight:600;opacity:.85}
+.platform-button b{font-size:18px}
+.platform-button .platform-icon{width:30px;height:30px}
+.platform-button .download-icon{width:21px;height:21px}
+.download-copy .button-mac{background:#f1f5ff;color:#102b59;border:2px solid #fff}
+.download-meta{grid-column:3;grid-row:1;display:flex;flex-direction:column;gap:18px;margin:12px 0 12px 10px;padding:12px 0 12px 22px;border-left:1px solid #b7d7f477;z-index:2}
+.meta-platform{display:flex;align-items:center;gap:12px}
+.meta-platform svg{width:32px;height:32px;flex:none}
+.meta-platform b{font-size:14px}
+.meta-platform small{font-size:11px}
+@media(max-width:900px) and (min-width:651px){.download-section{grid-template-columns:minmax(190px,30%) minmax(0,1fr) minmax(170px,24%);min-height:260px;padding-right:12px}.download-section .sleepy-scene{width:39%}.download-copy{padding-right:8px}.download-copy h2{font-size:23px}.download-copy p{font-size:12px}.download-copy .platform-button{height:54px;padding:0 10px}.platform-button b{font-size:13px}.platform-button small{font-size:9px}.platform-button .platform-icon{width:22px;height:22px}.download-meta{padding-left:12px;gap:12px}.meta-platform svg{width:24px;height:24px}.meta-platform b{font-size:11px}.meta-platform small{font-size:9px}}
+@media(max-width:650px){.download-section{display:flex;flex-direction:column;align-items:stretch;min-height:0;padding:10px 0 16px;margin:8px 12px 28px;border-radius:22px;text-align:center;background:linear-gradient(160deg,#082551,#103260 58%,#154375)}.download-section .sleepy-scene{display:block;position:relative;width:min(88%,330px);height:auto;max-height:190px;object-fit:contain;object-position:center;margin:0 auto 2px}.download-copy{width:100%;padding:0 16px 16px;text-align:center}.download-copy h2{font-size:22px}.download-copy p{font-size:12px;margin:0 auto 14px}.download-platforms{grid-template-columns:1fr;gap:9px}.download-copy .platform-button{height:54px;width:100%;padding:0 18px;border-radius:28px}.platform-button b{font-size:15px}.platform-button small{font-size:10px}.platform-button .platform-icon{width:23px;height:23px}.platform-button .download-icon{width:17px;height:17px}.download-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:auto;margin:0 16px;padding:14px 0 0;border:0;border-top:1px solid #b7d7f455;text-align:left}.meta-platform{gap:7px}.meta-platform svg{width:21px;height:21px}.meta-platform b{font-size:10px}.meta-platform small{font-size:8px}}
