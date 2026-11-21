@@ -38,7 +38,8 @@ function receiveDesktopIncoming(message){
   if(message.sender_id===cloudUser?.id)return;
   const sameChat=activeConversation?.id===message.conversation_id;
   const dashboardVisible=document.visibilityState==='visible';
-  if(sameChat&&dashboardVisible){appendCloudMessage(message);return;}
+  // Pesan tetap dimasukkan ke chat yang sedang terbuka, walau dashboard sedang tersembunyi.
+  if(sameChat){appendCloudMessage(message);if(dashboardVisible)return;}
   playIncomingSound();
   updateChatUnread(message.conversation_id,true);
   const peer=conversations.find(c=>c.id===message.conversation_id)?.other?.[0];
@@ -633,6 +634,7 @@ function startChatRealtime(id){
   const ch=cloud.channel(channelName).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>receiveDesktopIncoming(payload.new)).subscribe();
   realtimeChannels.push(ch);
 }
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&activeConversation&&unreadChats[activeConversation.id])updateChatUnread(activeConversation.id,false);});
 api.on('chat:open-conversation',async ({conversationId})=>{
   if(!cloudUser||!conversationId)return;
   await loadCloudConversations();
