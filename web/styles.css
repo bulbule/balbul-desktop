@@ -41,3 +41,26 @@
 .list-row.has-unread .details strong { font-weight:800; color:#087f90; }
 .list-row.has-unread { background:#f4fcf9; }
 @media(max-width:650px){.sound-toggle{padding:7px 8px;font-size:9px}}
+
+/* Web chat refresh: optimistic messages, delivery receipts, and persistent Home navigation */
+.topbar-actions{display:flex;align-items:center;gap:10px}
+.home-btn{border:1px solid #d5edf0!important;background:#fff!important;color:#168c9b!important}
+.home-btn:hover{background:#eafafb!important;transform:translateY(-1px)}
+.bubble{position:relative;min-width:74px;padding:11px 14px 8px;border-radius:16px;animation:web-message-in .16s ease-out both}
+@keyframes web-message-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.bubble.mine{border-bottom-right-radius:5px}
+.bubble:not(.mine){border-bottom-left-radius:5px}
+.message-body{white-space:pre-wrap;overflow-wrap:anywhere}
+.message-meta{display:flex;justify-content:flex-end;align-items:center;gap:7px;margin-top:5px;font-size:9px;color:#91a7ae;min-height:12px}
+.message-meta time{display:inline;color:inherit;font-size:9px;margin:0}
+.delivery-status{font-size:9px;letter-spacing:-.5px;white-space:nowrap;color:#90a5ac}
+.delivery-status.pending{color:#a4b6bb}
+.delivery-status.sent{color:#8ba2a9}
+.delivery-status.read{color:#16b95d;font-weight:800}
+.delivery-status.failed{color:#d34d5a;text-decoration:underline;cursor:pointer;font-weight:700}
+.bubble.mine[data-status="pending"]{opacity:.78}
+.bubble.mine[data-status="failed"]{border-color:#f3bfc5;background:#fff4f5}
+.messages{scroll-behavior:smooth;overscroll-behavior:contain}
+.composer{position:sticky;bottom:0;z-index:2}
+.composer button:disabled{opacity:.65;cursor:wait}
+@media(max-width:650px){.topbar-actions{gap:6px}.topbar-actions button{padding:8px 10px}.active-chat{min-height:540px}.messages{max-height:none;min-height:320px;padding:15px 12px}.bubble{max-width:86%}}
