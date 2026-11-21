@@ -1,6 +1,6 @@
 {
   "name": "balbul-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "balBul - asisten desktop pixel art untuk pengingat dan to-do list",
   "main": "src/main.js",
   "scripts": {
@@ -12,8 +12,7 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "latest",
-    "electron-builder": "latest",
-    "electron-updater": "^6.6.2"
+    "electron-builder": "latest"
   },
   "build": {
     "appId": "com.balbul.desktop",
@@ -56,5 +55,8 @@
         "releaseType": "release"
       }
     ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   }
 }
