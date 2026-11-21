@@ -102,6 +102,7 @@
 .download-copy p{font-size:clamp(12px,1.1vw,14px);line-height:1.55;color:#d4e8fa;margin:0 0 16px;max-width:360px}
 .download-copy .button{padding:0 30px;height:50px;font-size:15px;gap:12px;box-shadow:0 10px 26px rgba(0,217,237,.32)}
 .download-copy .button svg{width:20px;height:20px;flex:none}
+.download-copy .mac-link{display:block;margin-top:13px;font-size:12px;font-weight:600;color:#bfe9f5;text-decoration:underline;text-underline-offset:3px}.download-copy .mac-link:hover{color:#fff}
 .download-meta{grid-column:3;align-self:center;margin:0 clamp(18px,3vw,44px) 0 clamp(14px,2vw,30px);padding:10px 0 10px clamp(18px,2.6vw,34px);border-left:1px solid rgba(180,214,245,.32);display:flex;align-items:center;gap:16px}
 .win-logo{width:40px;height:40px;color:#26e2f2;flex:none}
 .download-meta b,.download-meta small{display:block}
