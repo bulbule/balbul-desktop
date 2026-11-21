@@ -213,3 +213,49 @@
  .platform-button small{font-size:9px}
  .platform-note{font-size:9px}
 }
+
+
+/* Desktop download banner refinement: smaller mascot area, wider copy, both platforms in the side panel */
+@media(min-width:651px){
+ .download-section{
+   grid-template-columns:minmax(190px,23%) minmax(0,1fr) minmax(215px,25%);
+   min-height:220px;
+   background-size:76% 100%;
+   background-position:left center;
+   background-repeat:no-repeat;
+ }
+ .download-copy{grid-column:2;padding:22px 18px 22px 8px}
+ .download-copy h2{font-size:clamp(20px,2vw,25px)}
+ .download-copy p{max-width:440px;margin-bottom:13px}
+ .download-platforms{gap:9px;flex-wrap:nowrap}
+ .download-copy .platform-button{min-width:0;flex:1;height:50px;padding:0 12px;gap:8px}
+ .platform-button .platform-icon{width:22px;height:22px}
+ .platform-button b{font-size:12px}
+ .platform-button small{font-size:9px}
+ .download-meta{
+   grid-column:3;
+   margin:0 20px 0 10px;
+   padding:8px 0 8px 20px;
+   display:flex;
+   flex-direction:column;
+   align-items:stretch;
+   gap:13px;
+ }
+ .meta-platform{display:flex;align-items:center;gap:12px;min-width:0}
+ .meta-platform svg{width:30px;height:30px;flex:none}
+ .meta-windows{color:#27e3f0}
+ .meta-apple{color:#fff}
+ .meta-platform b{font-size:13px;line-height:1.2}
+ .meta-platform small{font-size:10px;line-height:1.35;margin-top:3px;white-space:nowrap}
+ .meta-tagline{font-size:10px;color:#c3d9ee;margin:0;padding-top:8px;border-top:1px solid rgba(180,214,245,.22)}
+}
+@media(min-width:651px) and (max-width:850px){
+ .download-section{grid-template-columns:minmax(130px,19%) minmax(0,1fr) minmax(180px,27%)}
+ .download-copy{padding-right:10px}
+ .download-copy .platform-button{padding:0 9px;gap:6px}
+ .platform-button .platform-icon{width:19px;height:19px}
+ .platform-button .download-icon{width:14px;height:14px}
+ .meta-platform svg{width:25px;height:25px}
+ .meta-platform small{font-size:9px}
+ .download-meta{padding-left:13px;margin-right:12px}
+}
