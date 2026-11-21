@@ -8,7 +8,8 @@
     "postinstall": "node scripts/vendor-supabase.js",
     "prestart": "node scripts/vendor-supabase.js",
     "dist": "electron-builder --win",
-    "dist:win": "electron-builder --win nsis --x64"
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
   "author": "bulbule",
   "license": "MIT",
@@ -56,7 +57,22 @@
         "repo": "balbul-desktop",
         "releaseType": "release"
       }
-    ]
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon-mac.png",
+      "identity": null,
+      "artifactName": "balBul-${version}-mac-${arch}.${ext}"
+    }
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
