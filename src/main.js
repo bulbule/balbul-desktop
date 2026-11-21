@@ -507,7 +507,7 @@ function createCharacterWindow() {
   charWin.on('closed', () => { charWin = null; });
 }
 
-function showDashboard() {
+function showDashboard({ silent = false } = {}) {
   if (dashWin && !dashWin.isDestroyed()) {
     if (dashWin.isMinimized()) dashWin.restore();
     dashWin.show();
@@ -522,6 +522,7 @@ function showDashboard() {
     title: 'balBul',
     backgroundColor: '#08161f',
     autoHideMenuBar: true,
+    show: false,
     icon: sprite('idle'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -533,6 +534,7 @@ function showDashboard() {
   });
   dashWin.setMenu(null);
   dashWin.loadFile(path.join(__dirname, 'dashboard', 'index.html'));
+  dashWin.once('ready-to-show', () => { if (!silent && dashWin && !dashWin.isDestroyed()) dashWin.show(); });
   // tombol X hanya menyembunyikan, balBul tetap jalan di tray
   dashWin.on('close', (e) => {
     if (!quitting) {
@@ -610,12 +612,10 @@ ipcMain.on('char:drag-start', () => {
 });
 ipcMain.on('char:drag-move', (_e, dx, dy) => {
   if (!dragStart || !charWin || charWin.isDestroyed()) return;
-  charWin.setBounds({
-    x: Math.round(dragStart.x + dx),
-    y: Math.round(dragStart.y + dy),
-    width: WIN_W,
-    height: settings.size + BUBBLE_H,
-  });
+  const area = screen.getDisplayMatching(charWin.getBounds()).workArea;
+  const x = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + dx)));
+  const y = Math.max(area.y, Math.min(area.y + area.height - settings.size - BUBBLE_H, Math.round(dragStart.y + dy)));
+  charWin.setBounds({ x, y, width: WIN_W, height: settings.size + BUBBLE_H });
 });
 ipcMain.on('char:drag-end', () => {
   if (!charWin || charWin.isDestroyed() || !dragStart) return;
@@ -629,13 +629,18 @@ ipcMain.on('char:click', toggleDashboard);
 ipcMain.on('char:menu', () => {
   if (charWin && !charWin.isDestroyed()) buildMenu().popup({ window: charWin });
 });
-ipcMain.on('app:open-dashboard', showDashboard);
+ipcMain.on('app:open-dashboard', () => showDashboard());
+ipcMain.on('char:quick-reply', (_e, payload) => {
+  if (!payload || typeof payload.conversationId !== 'string' || !dashWin || dashWin.isDestroyed()) return;
+  const body = String(payload.body || '').trim().slice(0, 4000);
+  if (body) dashWin.webContents.send('chat:quick-reply', { conversationId: payload.conversationId, body });
+});
 ipcMain.on('app:notify-chat', (_e, payload) => {
   if (!payload || typeof payload.conversationId !== 'string') return;
   const title = String(payload.title || 'Pesan baru').slice(0, 120);
-  const body = String(payload.body || '').slice(0, 180);
-  // Notifikasi utama muncul langsung di bubble karakter balBul, bukan hanya toast Windows.
-  setOverride('happy', `Pesan dari ${title}: ${body}`, 18000, { sound: true });
+  const body = String(payload.body || '').slice(0, 500);
+  if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:chat-message', { conversationId: payload.conversationId, sender: title, body });
+  setOverride('thinking', `Pesan baru dari ${title}`, 18000, { sound: true });
   if (!Notification.isSupported()) return;
   try {
     const n = new Notification({ title: `Pesan baru · ${title}`, body, icon: nativeImage.createFromPath(sprite('idle')) });
@@ -659,6 +664,7 @@ app.whenReady().then(() => {
 
   createTray();
   createCharacterWindow();
+  showDashboard({ silent: true });
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
