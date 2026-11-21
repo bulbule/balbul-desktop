@@ -5,10 +5,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = (s) => document.querySelector(s);
 const landingView = $('#landingView'), authView = $('#authView'), appView = $('#appView');
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
-let conversations = [], friends = [];
+let conversations = [], friends = [], conversationMembers = [];
 const openingDirectIds = new Set();
 let unreadChats = {}, soundEnabled = localStorage.getItem('balbul-chat-sound') !== 'off', audioContext = null, globalMessageChannel = null;
 const seenMessageIds = new Set();
+let receiptChannel = null;
 function unreadStorageKey(){return 'balbul-unread-'+(user?.id||'guest');}
 function loadUnread(){try{unreadChats=JSON.parse(localStorage.getItem(unreadStorageKey())||'{}')||{};}catch(_){unreadChats={};}}
 function saveUnread(){localStorage.setItem(unreadStorageKey(),JSON.stringify(unreadChats));}
@@ -88,6 +89,7 @@ $('#forgotBtn').addEventListener('click', async () => {
   notice(error ? error.message : 'Link reset password dikirim jika email terdaftar.');
 });
 $('#signOut').addEventListener('click', async () => { await supabase.auth.signOut(); });
+$('#goHome')?.addEventListener('click',()=>{appView.classList.add('hidden');landingView.classList.remove('hidden');window.scrollTo(0,0);});
 
 async function enterApp(currentUser) {
   user = currentUser;
@@ -228,16 +230,107 @@ async function openDirect(p,button){
   }catch(err){alert(err.message||'Gagal membuka chat.');}
   finally{openingDirectIds.delete(p.id);if(button){button.disabled=false;button.textContent=original||'Chat';button.classList.remove('is-loading');}}
 }
-async function openConversation(c){activeConversation=c;setUnread(c.id,false);$('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}renderConversations();if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}await loadMessages(c.id);}
+async function openConversation(c){
+  activeConversation=c;setUnread(c.id,false);
+  $('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');
+  const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();
+  let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}
+  renderConversations();
+  if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}
+  if(receiptChannel){await supabase.removeChannel(receiptChannel);receiptChannel=null;}
+  const {data: members,error:memberError}=await supabase.from('conversation_members').select('user_id,last_read_at').eq('conversation_id',c.id);
+  if(memberError)console.warn('Gagal memuat status baca:',memberError.message);
+  conversationMembers=members||[];
+  await loadMessages(c.id);
+  await markConversationRead(c.id);
+  messageChannel=supabase.channel('web-chat-'+c.id+'-'+user.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+c.id},payload=>receiveConversationMessage(payload.new))
+    .subscribe();
+  receiptChannel=supabase.channel('web-receipts-'+c.id+'-'+user.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'conversation_members',filter:'conversation_id=eq.'+c.id},async payload=>{
+      const idx=conversationMembers.findIndex(x=>x.user_id===payload.new.user_id);
+      if(idx>=0)conversationMembers[idx]=payload.new;else conversationMembers.push(payload.new);
+      renderAllReadStatuses();
+    }).subscribe();
+}
 async function leaveCurrentConversation(){
   if(!activeConversation||!confirm('Hapus chat ini dari daftar kamu? Riwayat pesan temanmu tidak akan dihapus.'))return;
   const id=activeConversation.id;
   const {error}=await supabase.from('conversation_members').delete().eq('conversation_id',id).eq('user_id',user.id);
   if(error){alert(error.message);return;}
   if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}
-  activeConversation=null;$('#activeChat').classList.add('hidden');$('#emptyChat').classList.remove('hidden');
+  if(receiptChannel){await supabase.removeChannel(receiptChannel);receiptChannel=null;}
+  conversationMembers=[];activeConversation=null;$('#activeChat').classList.add('hidden');$('#emptyChat').classList.remove('hidden');
   await loadConversations();
 }
-async function loadMessages(id){const {data,error}=await supabase.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);if(error)return alert(error.message);$('#messages').replaceChildren();(data||[]).forEach(appendMessage);$('#messages').scrollTop=$('#messages').scrollHeight;}
-function appendMessage(m){if(!activeConversation||m.conversation_id!==activeConversation.id)return;if($('#messages').querySelector('[data-id="'+m.id+'"]'))return;const el=document.createElement('div');el.className='bubble'+(m.sender_id===user.id?' mine':'');el.dataset.id=m.id;const body=document.createElement('div');body.textContent=m.body;const time=document.createElement('time');time.textContent=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});el.append(body,time);$('#messages').append(el);$('#messages').scrollTop=$('#messages').scrollHeight;}
-$('#messageForm').addEventListener('submit',async e=>{e.preventDefault();if(!activeConversation)return;const body=$('#messageInput').value.trim();if(!body)return;$('#messageInput').value='';const {error}=await supabase.from('messages').insert({conversation_id:activeConversation.id,sender_id:user.id,body});if(error){$('#messageInput').value=body;alert(error.message);}});
+async function loadMessages(id){
+  const {data,error}=await supabase.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);
+  if(error)return alert(error.message);
+  $('#messages').replaceChildren();(data||[]).forEach(appendMessage);renderAllReadStatuses();$('#messages').scrollTop=$('#messages').scrollHeight;
+}
+function getPeerReadAt(){return conversationMembers.filter(m=>m.user_id!==user?.id).map(m=>m.last_read_at).filter(Boolean).sort().at(-1)||null;}
+function setMessageStatus(el,status){
+  if(!el)return;el.dataset.status=status;
+  let meta=el.querySelector('.message-meta');
+  if(!meta){meta=document.createElement('div');meta.className='message-meta';el.append(meta);}
+  const time=el.dataset.timeLabel||'';
+  const labels={pending:'◷ Mengirim',failed:'Gagal · klik untuk coba lagi',sent:'✓ Terkirim',read:'✓✓ Dibaca'};
+  meta.innerHTML='<time></time><span class="delivery-status"></span>';
+  meta.querySelector('time').textContent=time;
+  const mark=meta.querySelector('.delivery-status');mark.textContent=labels[status]||'';
+  mark.className='delivery-status '+status;
+}
+function renderAllReadStatuses(){
+  const readAt=getPeerReadAt();
+  document.querySelectorAll('#messages .bubble.mine[data-status="sent"],#messages .bubble.mine[data-status="read"]').forEach(el=>{
+    const created=Date.parse(el.dataset.createdAt||'');
+    setMessageStatus(el,readAt&&created&&Date.parse(readAt)>=created?'read':'sent');
+  });
+}
+function appendMessage(m){
+  if(!activeConversation||m.conversation_id!==activeConversation.id)return;
+  let existing=$('#messages').querySelector('[data-id="'+m.id+'"]');
+  if(!existing&&m.sender_id===user.id){
+    existing=[...$('#messages').querySelectorAll('.bubble.mine[data-status="pending"]')].find(el=>el.querySelector('.message-body')?.textContent===m.body);
+    if(existing){existing.dataset.id=m.id;existing.dataset.createdAt=m.created_at;existing.dataset.timeLabel=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(existing,'sent');renderAllReadStatuses();return;}
+  }
+  if(existing)return;
+  const el=document.createElement('div');el.className='bubble'+(m.sender_id===user.id?' mine':'');el.dataset.id=m.id;el.dataset.createdAt=m.created_at;
+  el.dataset.timeLabel=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  const body=document.createElement('div');body.className='message-body';body.textContent=m.body;el.append(body);
+  $('#messages').append(el);
+  if(m.sender_id===user.id)setMessageStatus(el,'sent');else{setMessageStatus(el,'received');markConversationRead(m.conversation_id);}
+  $('#messages').scrollTop=$('#messages').scrollHeight;
+  renderAllReadStatuses();
+}
+function receiveConversationMessage(message){
+  if(!message?.id||seenMessageIds.has(message.id))return;
+  seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);
+  if(message.sender_id===user.id){appendMessage(message);return;}
+  appendMessage(message);playIncomingSound();
+}
+async function markConversationRead(conversationId){
+  if(!user||!conversationId||document.visibilityState==='hidden')return;
+  const now=new Date().toISOString();
+  const {error}=await supabase.from('conversation_members').update({last_read_at:now}).eq('conversation_id',conversationId).eq('user_id',user.id);
+  if(!error){const me=conversationMembers.find(m=>m.user_id===user.id);if(me)me.last_read_at=now;}
+  else console.warn('Gagal memperbarui status baca:',error.message);
+}
+async function retryWebMessage(el,body,conversationId){
+  if(!el||el.dataset.status==='pending')return;
+  setMessageStatus(el,'pending');
+  const {data,error}=await supabase.from('messages').insert({conversation_id:conversationId,sender_id:user.id,body}).select().single();
+  if(error){setMessageStatus(el,'failed');return;}
+  el.dataset.id=data.id;el.dataset.createdAt=data.created_at;el.dataset.timeLabel=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(el,'sent');renderAllReadStatuses();
+}
+$('#messageForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!activeConversation)return;
+  const input=$('#messageInput'),body=input.value.trim();if(!body)return;
+  const conversationId=activeConversation.id,tempId='pending-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+  input.value='';
+  const el=document.createElement('div');el.className='bubble mine';el.dataset.id=tempId;el.dataset.createdAt=new Date().toISOString();el.dataset.timeLabel=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  const text=document.createElement('div');text.className='message-body';text.textContent=body;el.append(text);$('#messages').append(el);setMessageStatus(el,'pending');$('#messages').scrollTop=$('#messages').scrollHeight;input.focus();
+  const {data,error}=await supabase.from('messages').insert({conversation_id:conversationId,sender_id:user.id,body}).select().single();
+  if(error){setMessageStatus(el,'failed');el.querySelector('.delivery-status').addEventListener('click',()=>retryWebMessage(el,body,conversationId));el.querySelector('.delivery-status').title=error.message;return;}
+  el.dataset.id=data.id;el.dataset.createdAt=data.created_at;el.dataset.timeLabel=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(el,'sent');renderAllReadStatuses();
+});
