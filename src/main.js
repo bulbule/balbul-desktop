@@ -527,6 +527,8 @@ function showDashboard() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // Dashboard tetap menerima Realtime meski jendelanya disembunyikan/minimize.
+      backgroundThrottling: false,
     },
   });
   dashWin.setMenu(null);
@@ -629,11 +631,14 @@ ipcMain.on('char:menu', () => {
 });
 ipcMain.on('app:open-dashboard', showDashboard);
 ipcMain.on('app:notify-chat', (_e, payload) => {
-  if (!payload || typeof payload.conversationId !== 'string' || !Notification.isSupported()) return;
+  if (!payload || typeof payload.conversationId !== 'string') return;
   const title = String(payload.title || 'Pesan baru').slice(0, 120);
-  const body = String(payload.body || '').slice(0, 240);
+  const body = String(payload.body || '').slice(0, 180);
+  // Notifikasi utama muncul langsung di bubble karakter balBul, bukan hanya toast Windows.
+  setOverride('happy', `Pesan dari ${title}: ${body}`, 18000, { sound: true });
+  if (!Notification.isSupported()) return;
   try {
-    const n = new Notification({ title, body, icon: nativeImage.createFromPath(sprite('idle')) });
+    const n = new Notification({ title: `Pesan baru · ${title}`, body, icon: nativeImage.createFromPath(sprite('idle')) });
     n.on('click', () => {
       showDashboard();
       if (dashWin && !dashWin.isDestroyed()) {
