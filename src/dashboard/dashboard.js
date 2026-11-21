@@ -641,6 +641,11 @@ api.on('chat:open-conversation',async ({conversationId})=>{
   activeConversation=conv;view='chat';updateChatUnread(conversationId,false);render();
   requestAnimationFrame(()=>$('#desktop-message-input')?.focus());
 });
+api.on('chat:quick-reply', async ({conversationId,body}) => {
+  if(!cloudUser||!cloud||!conversationId||!body)return;
+  try { const {error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}); if(error)throw error; if(activeConversation?.id===conversationId)await loadCloudMessages(conversationId); }
+  catch(err){console.error('Quick reply failed:',err);api.notifyChat({conversationId,title:'Balasan gagal',body:'Buka Dashboard untuk mencoba lagi.'});}
+});
 window.addEventListener('balbul-auth-ready',async event=>{
   cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;loadUnreadChats();
   if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
