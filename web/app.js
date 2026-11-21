@@ -318,7 +318,7 @@ async function markConversationRead(conversationId){
   else console.warn('Gagal memperbarui status baca:',error.message);
 }
 async function retryWebMessage(el,body,conversationId){
-  if(!el||el.dataset.status==='pending')return;
+  if(!el||el.dataset.status!=='failed')return;
   setMessageStatus(el,'pending');
   const {data,error}=await supabase.from('messages').insert({conversation_id:conversationId,sender_id:user.id,body}).select().single();
   if(error){setMessageStatus(el,'failed');return;}
