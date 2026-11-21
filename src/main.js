@@ -628,6 +628,22 @@ ipcMain.on('char:menu', () => {
   if (charWin && !charWin.isDestroyed()) buildMenu().popup({ window: charWin });
 });
 ipcMain.on('app:open-dashboard', showDashboard);
+ipcMain.on('app:notify-chat', (_e, payload) => {
+  if (!payload || typeof payload.conversationId !== 'string' || !Notification.isSupported()) return;
+  const title = String(payload.title || 'Pesan baru').slice(0, 120);
+  const body = String(payload.body || '').slice(0, 240);
+  try {
+    const n = new Notification({ title, body, icon: nativeImage.createFromPath(sprite('idle')) });
+    n.on('click', () => {
+      showDashboard();
+      if (dashWin && !dashWin.isDestroyed()) {
+        const conversationId = payload.conversationId;
+        dashWin.webContents.send('chat:open-conversation', { conversationId });
+      }
+    });
+    n.show();
+  } catch (err) { console.error('Notifikasi chat gagal:', err); }
+});
 
 // ---------------------------------------------------------------- start
 app.whenReady().then(() => {
