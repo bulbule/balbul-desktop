@@ -340,3 +340,10 @@ body:not(.authenticated) #sidebar { display: none; }
 .cloud-connection-status.online { color:#22c55e; }
 .cloud-connection-status.offline { color:#f87171; }
 .cloud-connection-status.connecting { color:#fbbf24; }
+
+/* Dashboard-wide cloud status + chat delivery feedback */
+.account-bar .cloud-connection-status { margin:0 auto 0 12px; white-space:nowrap; }
+.message-send-state { display:block; margin-top:4px; font-size:10px; opacity:.8; text-align:right; }
+.message-send-state.sending { color:#fbbf24; }
+.message-send-state.sent { color:#22c55e; }
+.message-send-state.failed { color:#f87171; text-decoration:underline; cursor:pointer; }
