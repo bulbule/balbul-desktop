@@ -1,6 +1,6 @@
 {
   "name": "balbul-desktop",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "balBul - asisten desktop pixel art untuk pengingat dan to-do list",
   "main": "src/main.js",
   "scripts": {
