@@ -189,3 +189,27 @@
   .site-footer{min-height:225px;background-size:auto 215px}
   .footer-bottom{font-size:9px;flex-wrap:wrap;justify-content:center}
 }
+
+
+/* ---------- platform download buttons ---------- */
+.download-platforms{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap}
+.download-copy .platform-button{height:54px;min-width:190px;padding:0 17px;justify-content:flex-start;gap:11px;border-radius:15px;font-size:13px;box-shadow:0 7px 20px rgba(0,217,237,.2)}
+.platform-button .platform-icon{width:25px;height:25px;flex:none}
+.platform-button .download-icon{width:17px;height:17px;margin-left:auto;flex:none}
+.platform-button span{display:flex;flex-direction:column;align-items:flex-start;gap:3px;line-height:1.1}
+.platform-button b{font-size:13px;font-weight:800}
+.platform-button small{font-size:10px;font-weight:600;opacity:.78}
+.download-copy .button-mac{background:rgba(255,255,255,.12);border:1px solid rgba(205,230,250,.58);color:#fff;box-shadow:0 7px 20px rgba(0,0,0,.12)}
+.download-copy .button-mac:hover{background:rgba(255,255,255,.2);box-shadow:0 10px 24px rgba(0,0,0,.2)}
+.platform-note{display:block;margin-top:11px;color:#c3d9ee;font-size:10px;letter-spacing:.1px}
+.download-meta-logo{width:38px;height:38px;color:#dceeff;flex:none}
+@media(max-width:1000px){.download-copy .platform-button{min-width:166px;padding:0 13px}}
+@media(max-width:650px){
+ .download-platforms{justify-content:center;gap:9px}
+ .download-copy .platform-button{height:49px;min-width:0;flex:1;padding:0 11px;gap:8px;border-radius:13px}
+ .platform-button .platform-icon{width:21px;height:21px}
+ .platform-button .download-icon{width:15px;height:15px}
+ .platform-button b{font-size:12px}
+ .platform-button small{font-size:9px}
+ .platform-note{font-size:9px}
+}
