@@ -47,7 +47,7 @@ function applyLook() {
 function setState(state) {
   currentState = SPRITES.includes(state) ? state : 'idle';
   const data = window.EYES && window.EYES[currentState];
-  const useEyes = tracking && !!data;
+  const useEyes = (tracking || document.body.classList.contains('lifted')) && !!data;
   img.src = `../../assets/sprites/${currentState}${useEyes ? '-noeyes' : ''}.png`;
   body.className = `st-${currentState}`;
   eyeEls.forEach((el, i) => {
@@ -178,6 +178,7 @@ img.addEventListener('pointerdown', (e) => {
   img.setPointerCapture(e.pointerId);
   drag = { sx: e.screenX, sy: e.screenY, moved: false };
   document.body.classList.add('lifted');
+  setState(currentState);
 });
 img.addEventListener('pointermove', (e) => {
   if (!drag) return;
@@ -196,6 +197,7 @@ img.addEventListener('pointerup', () => {
   const { moved } = drag;
   drag = null;
   document.body.classList.remove('lifted');
+  setState(currentState);
   if (moved) api.dragEnd();
   else api.clickCharacter();
 });
