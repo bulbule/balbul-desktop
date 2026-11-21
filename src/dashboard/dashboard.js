@@ -456,7 +456,7 @@ function renderChatView(){
     h('form',{class:'desktop-message-form',onsubmit:sendDesktopMessage},
       h('input',{id:'desktop-message-input',maxlength:'4000',placeholder:'Tulis pesan...',autocomplete:'off'}),
       h('button',{class:'cloud-btn',type:'submit'},'Kirim')));
-  $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.')),h('button',{id:'desktop-chat-sound',class:'chat-sound-toggle',type:'button',onclick:toggleChatSound,'aria-pressed':String(soundEnabled)},soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati')),
+  $('#main').replaceChildren(h('div',{class:'head'},h('div',{},h('h1',{},'Chat realtime'),h('div',{class:'date'},'Ngobrol langsung dengan teman balBul.'),h('span',{id:'cloud-connection-status',class:'cloud-connection-status '+cloudConnectionState},cloudConnectionState==='online'?'● Online':cloudConnectionState==='offline'?'● Offline':'◌ Connecting')),h('button',{id:'desktop-chat-sound',class:'chat-sound-toggle',type:'button',onclick:toggleChatSound,'aria-pressed':String(soundEnabled)},soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati')),
     h('div',{id:'cloud-notice',class:'cloud-notice'}),h('div',{class:'desktop-chat-layout'},h('div',{class:'chat-conversation-list'},list),pane));
   if(activeConversation){startChatRealtime(activeConversation.id);loadCloudMessages(activeConversation.id);}
   updateSoundButton();
@@ -507,19 +507,74 @@ async function sendDesktopMessage(e){
   input.value='';const {error}=await cloud.from('messages').insert({conversation_id:activeConversation.id,sender_id:cloudUser.id,body});
   if(error){input.value=body;cloudNotice(error.message,true);}
 }
+let cloudConnectionState='connecting';
+let realtimeStates={};
+let reconnectTimer=null;
+let reconnectAttempt=0;
+let cloudSyncBusy=false;
+function updateCloudConnectionState(){
+  const states=Object.values(realtimeStates);
+  const next=!navigator.onLine?'offline':(states.length&&states.every(x=>x==='SUBSCRIBED')?'online':'connecting');
+  if(next===cloudConnectionState)return;
+  cloudConnectionState=next;
+  const badge=$('#cloud-connection-status');
+  if(badge){badge.className='cloud-connection-status '+next;badge.textContent=next==='online'?'● Online':next==='offline'?'● Offline':'◌ Connecting';}
+}
+function scheduleCloudReconnect(){
+  if(!cloudUser||!navigator.onLine||reconnectTimer)return;
+  const delay=Math.min(30000,1500*Math.pow(2,reconnectAttempt++));
+  updateCloudConnectionState();
+  reconnectTimer=setTimeout(()=>{reconnectTimer=null;startCloudRealtime();},delay);
+}
+async function syncCloudState(){
+  if(!cloudUser||!cloud||cloudSyncBusy)return;
+  cloudSyncBusy=true;
+  try{
+    const jobs=[loadFriendData(),loadCloudConversations(),loadSharedTasks()];
+    if(activeConversation?.id)jobs.push(loadCloudMessages(activeConversation.id));
+    const results=await Promise.allSettled(jobs);
+    const failed=results.find(x=>x.status==='rejected');
+    if(failed)console.error('Cloud resync failed:',failed.reason);
+  }finally{cloudSyncBusy=false;}
+}
 function startCloudRealtime(){
-  realtimeChannels.forEach(ch=>cloud.removeChannel(ch));realtimeChannels=[];
+  if(!cloudUser||!cloud)return;
+  if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
+  realtimeChannels.forEach(ch=>cloud.removeChannel(ch));
+  realtimeChannels=[];
+  realtimeStates={};
+  const subscribe=(name,channel)=>{
+    realtimeStates[name]='connecting';
+    channel.subscribe(status=>{
+      realtimeStates[name]=status;
+      updateCloudConnectionState();
+      if(status==='SUBSCRIBED'){
+        reconnectAttempt=0;
+        if(Object.values(realtimeStates).every(x=>x==='SUBSCRIBED'))syncCloudState();
+      }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status))scheduleCloudReconnect();
+    });
+    realtimeChannels.push(channel);
+  };
   const friendsChannel=cloud.channel('balbul-desktop-friends-'+cloudUser.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests',filter:'receiver_id=eq.'+cloudUser.id},()=>loadFriendData().catch(console.error))
-    .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error)).subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error));
   const tasksChannel=cloud.channel('balbul-desktop-tasks-'+cloudUser.id)
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>loadSharedTasks().catch(console.error))
-    .on('postgres_changes',{event:'*',schema:'public',table:'task_members'},()=>loadSharedTasks().catch(console.error)).subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_members'},()=>loadSharedTasks().catch(console.error));
   const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
-    .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>loadCloudConversations().catch(console.error)).subscribe();
-  const messagesChannel=cloud.channel('balbul-all-messages-'+cloudUser.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveDesktopIncoming(payload.new)).subscribe();
-  realtimeChannels.push(friendsChannel,membersChannel,tasksChannel,messagesChannel);
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>syncCloudState());
+  const messagesChannel=cloud.channel('balbul-all-messages-'+cloudUser.id)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveDesktopIncoming(payload.new));
+  subscribe('friends',friendsChannel);
+  subscribe('tasks',tasksChannel);
+  subscribe('members',membersChannel);
+  subscribe('messages',messagesChannel);
+  updateCloudConnectionState();
 }
+window.addEventListener('online',()=>{updateCloudConnectionState();reconnectAttempt=0;startCloudRealtime();});
+window.addEventListener('offline',()=>updateCloudConnectionState());
+window.addEventListener('focus',()=>{if(navigator.onLine)syncCloudState();});
+
 function startChatRealtime(id){
   const channelName='balbul-desktop-chat-'+id;
   realtimeChannels.filter(ch=>ch.topic==='realtime:'+channelName).forEach(ch=>{cloud.removeChannel(ch);realtimeChannels=realtimeChannels.filter(x=>x!==ch);});
@@ -528,8 +583,9 @@ function startChatRealtime(id){
 }
 window.addEventListener('balbul-auth-ready',async event=>{
   cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;loadUnreadChats();
-  try{await Promise.all([loadFriendData(),loadCloudConversations(),loadSharedTasks()]);startCloudRealtime();}
-  catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);}
+  if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
+  try{await syncCloudState();startCloudRealtime();}
+  catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);scheduleCloudReconnect();}
 });
 
 

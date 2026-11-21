@@ -20,6 +20,8 @@
     "directories": {
       "output": "dist"
     },
+    "compression": "maximum",
+    "asar": true,
     "files": [
       "src/**/*",
       "assets/**/*",
