@@ -102,7 +102,7 @@ function showBubble(text, ttl, taskId, kind) {
   btnDone.textContent = kind === 'reminder' ? 'Oke' : 'Selesai';
   bubbleActions.classList.toggle('hidden', !taskId);
   bubble.classList.remove('hidden');
-  bubbleTimer = setTimeout(hideBubble, ttl);
+  bubbleTimer = setTimeout(hideBubble, Math.max(2500,Math.min(Number(ttl)||8000,30000)));
 }
 
 // ---------- suara ----------
