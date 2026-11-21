@@ -107,14 +107,49 @@ async function enterApp(currentUser) {
   updateChatNavDot();updateSoundButton();
 }
 function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel);if(globalMessageChannel){supabase.removeChannel(globalMessageChannel);globalMessageChannel=null;} }
+// ---- Pemulihan password: tampilkan form password baru setelah klik tautan email ----
+let recovering = /(^|[#&?])type=recovery/.test(location.hash);
+function setRecoveryUi(on) {
+  $('#recoveryForm').classList.toggle('hidden', !on);
+  $('#authForm').classList.toggle('hidden', on);
+  $('#forgotBtn').classList.toggle('hidden', on);
+  document.querySelector('.tabs').classList.toggle('hidden', on);
+}
+function startRecovery() {
+  recovering = true;
+  showAuthMode('login');
+  setRecoveryUi(true);
+  $('#authTitle').textContent = 'Buat password baru';
+  $('#authSubtitle').textContent = 'Masukkan password baru untuk akun kamu.';
+  notice('');
+  history.replaceState(null, '', location.pathname + location.search);
+}
+$('#recoveryForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pw = $('#newPassword').value, pw2 = $('#newPassword2').value;
+  if (pw.length < 8) return notice('Password minimal 8 karakter.', true);
+  if (pw !== pw2) return notice('Kedua password tidak sama.', true);
+  notice('Menyimpan password baru...');
+  const { data, error } = await supabase.auth.updateUser({ password: pw });
+  if (error) return notice(error.message || 'Gagal menyimpan password.', true);
+  recovering = false;
+  setRecoveryUi(false);
+  $('#recoveryForm').reset();
+  try {
+    if (data.user?.email_confirmed_at) await enterApp(data.user);
+    else { showAuthMode('login'); notice('Password diperbarui. Silakan masuk.'); }
+  } catch (err) { notice(err.message, true); }
+});
 supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'PASSWORD_RECOVERY') { notice('Sesi pemulihan password aktif. Fitur ubah password akan tersedia di pengaturan akun.'); return; }
+  if (event === 'PASSWORD_RECOVERY') { startRecovery(); return; }
+  if (recovering) return;
   if (session?.user && session.user.email_confirmed_at) {
     if (!user || user.id !== session.user.id) { try { await enterApp(session.user); } catch (e) { notice(e.message, true); } }
   } else if (!session) { user = null; profile = null; showAuth(); }
 });
 const { data: initial } = await supabase.auth.getSession();
-if (initial.session?.user?.email_confirmed_at) { try { await enterApp(initial.session.user); } catch (e) { notice(e.message, true); } }
+if (recovering) { startRecovery(); }
+else if (initial.session?.user?.email_confirmed_at) { try { await enterApp(initial.session.user); } catch (e) { notice(e.message, true); } }
 if (location.hash.includes('error_description')) notice(decodeURIComponent(location.hash.split('error_description=')[1]?.replaceAll('+',' ') || 'Verifikasi gagal.'), true);
 
 $('#copyCode').addEventListener('click', async () => { await navigator.clipboard.writeText(profile.friend_code); $('#copyCode').textContent='✓'; setTimeout(()=>$('#copyCode').textContent='⧉',1200); });
@@ -159,11 +194,13 @@ async function loadConversations(){
   if(e)throw e;
   const {data: members,error:mErr}=await supabase.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);
   if(mErr)throw mErr;
-  const otherIds=[...new Set((members||[]).filter(x=>x.user_id!==user.id).map(x=>x.user_id))];
+  // Chat langsung yang ditinggal temannya: pasangan tetap bisa dikenali dari direct_key.
+  const keyOther=c=>c.kind==='direct'&&c.direct_key?c.direct_key.split(':').find(x=>x!==user.id):null;
+  const otherIds=[...new Set([...(members||[]).filter(x=>x.user_id!==user.id).map(x=>x.user_id),...(rows||[]).map(keyOther).filter(Boolean)])];
   const {data: people,error:pErr}=otherIds.length?await supabase.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};
   if(pErr)throw pErr;
   const byId=Object.fromEntries((people||[]).map(p=>[p.id,p]));
-  const mapped=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(m=>m.conversation_id===conv.id&&m.user_id!==user.id).map(m=>byId[m.user_id]).filter(Boolean)}));
+  const mapped=(rows||[]).map(conv=>{let other=(members||[]).filter(m=>m.conversation_id===conv.id&&m.user_id!==user.id).map(m=>byId[m.user_id]).filter(Boolean);if(!other.length&&keyOther(conv)&&byId[keyOther(conv)])other=[byId[keyOther(conv)]];return {...conv,other};});
   // Existing duplicate direct threads are represented by one row per friend.
   const seen=new Set();
   conversations=mapped.filter(conv=>{

@@ -1,4 +1,15 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+(function () {
+'use strict';
+// supabase-js dimuat lokal dari vendor/supabase.js (disalin saat `npm install`).
+const createClient = window.supabase && window.supabase.createClient;
+if (!createClient) {
+  const box = document.querySelector('#auth-message');
+  if (box) {
+    box.textContent = 'Komponen akun belum terpasang. Jalankan "npm install" lalu "npm start" lagi.';
+    box.classList.add('error');
+  }
+  throw new Error('supabase-js lokal tidak ditemukan (src/dashboard/vendor/supabase.js)');
+}
 
 const SUPABASE_URL = 'https://okdckmorwoihndvzmhsx.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_LUfyYbWQukN05lCYPsF5AQ_-9tsAMhJ';
@@ -146,4 +157,5 @@ supabase.auth.onAuthStateChange((event, session) => {
     showSignedOut();
     say(error.message || 'Tidak bisa mengakses layanan akun. Periksa koneksi internet.', true);
   }
+})();
 })();

@@ -7,6 +7,7 @@ on:
       - "package.json"
       - "src/**"
       - "assets/**"
+      - "scripts/**"
       - ".github/workflows/build-windows.yml"
 permissions:
   contents: write
@@ -20,8 +21,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Read app version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = node -p "require('./package.json').version"
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "App version: $v"
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        shell: pwsh
+        run: |
+          if (Test-Path package-lock.json) { npm ci --no-audit --no-fund } else { npm install --no-audit --no-fund }
       - name: Verify updater is a production dependency
         run: |
           npm ls electron-updater --omit=dev
@@ -46,23 +56,35 @@ jobs:
       - name: Upload installer and updater metadata
         uses: actions/upload-artifact@v4
         with:
-          name: balBul-Windows-Installer-v1.0.2
+          name: balBul-Windows-Installer-v${{ steps.ver.outputs.version }}
           path: |
             dist/balBul-Setup.exe
             dist/latest.yml
             dist/*.blockmap
           if-no-files-found: error
           retention-days: 30
-      - name: Publish balBul v1.0.2 release
+      - name: Check whether this version is already released
+        id: rel
         if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "v${{ steps.ver.outputs.version }}" --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) { "exists=true" >> $env:GITHUB_OUTPUT } else { "exists=false" >> $env:GITHUB_OUTPUT }
+          $global:LASTEXITCODE = 0
+      - name: Skip notice (release already exists)
+        if: steps.rel.outputs.exists == 'true'
+        shell: pwsh
+        run: Write-Host "Release v${{ steps.ver.outputs.version }} sudah ada, tidak ditimpa. Naikkan 'version' di package.json untuk merilis versi baru."
+      - name: Publish release
+        if: github.ref == 'refs/heads/main' && steps.rel.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.2
-          target_commitish: main
-          name: balBul v1.0.2
-          body: |
-            balBul v1.0.2 fixes the Windows startup crash caused by electron-updater not being packaged.
-            Includes the Windows installer and auto-update metadata.
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: balBul v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
           files: |
             dist/balBul-Setup.exe
             dist/latest.yml

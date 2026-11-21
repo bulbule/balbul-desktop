@@ -5,6 +5,8 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "postinstall": "node scripts/vendor-supabase.js",
+    "prestart": "node scripts/vendor-supabase.js",
     "dist": "electron-builder --win",
     "dist:win": "electron-builder --win nsis --x64"
   },
@@ -57,6 +59,7 @@
     ]
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.119.2",
     "electron-updater": "^6.6.2"
   }
 }

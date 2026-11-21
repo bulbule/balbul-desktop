@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' https://esm.sh; connect-src 'self' https://okdckmorwoihndvzmhsx.supabase.co wss://okdckmorwoihndvzmhsx.supabase.co">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://okdckmorwoihndvzmhsx.supabase.co wss://okdckmorwoihndvzmhsx.supabase.co">
   <title>balBul</title>
   <link rel="stylesheet" href="dashboard.css">
 </head>
@@ -128,7 +128,8 @@
     </form>
   </dialog>
 
-  <script type="module" src="auth.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="auth.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

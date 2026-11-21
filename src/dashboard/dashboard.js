@@ -433,10 +433,11 @@ async function loadCloudConversations(){
   if(!ids.length){conversations=[];activeConversation=null;if(view==='chat')renderChatView();return;}
   const {data:rows,error:e}=await cloud.from('conversations').select('*').in('id',ids).order('created_at',{ascending:false});if(e)throw e;
   const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);if(m)throw m;
-  const otherIds=[...new Set((members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id))];
+  const keyOther=c=>c.kind==='direct'&&c.direct_key?c.direct_key.split(':').find(x=>x!==cloudUser.id):null;
+  const otherIds=[...new Set([...(members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id),...(rows||[]).map(keyOther).filter(Boolean)])];
   const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};if(p)throw p;
   const byId=Object.fromEntries((people||[]).map(x=>[x.id,x]));
-  const mapped=(rows||[]).map(conv=>({...conv,other:(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean)}));
+  const mapped=(rows||[]).map(conv=>{let other=(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean);if(!other.length&&keyOther(conv)&&byId[keyOther(conv)])other=[byId[keyOther(conv)]];return {...conv,other};});
   const seen=new Set();conversations=mapped.filter(conv=>{if(conv.kind!=='direct')return true;const otherId=conv.other[0]?.id;if(!otherId)return true;if(seen.has(otherId))return false;seen.add(otherId);return true;});
   if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   if(view==='chat')renderChatView();
