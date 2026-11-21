@@ -22,28 +22,47 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build Windows installer and updater metadata
+      - name: Verify updater is a production dependency
+        run: |
+          npm ls electron-updater --omit=dev
+          node -e "const p=require('./node_modules/electron-updater/package.json'); console.log('electron-updater production dependency:', p.version)"
+      - name: Build Windows installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist:win -- --publish never
-      - name: Upload installer artifact
+      - name: Verify packaged updater dependency
+        shell: pwsh
+        run: |
+          $asar = "dist/win-unpacked/resources/app.asar"
+          if (!(Test-Path $asar)) { throw "app.asar not found: $asar" }
+          npx --yes @electron/asar list $asar | Select-String "node_modules/electron-updater/package.json"
+          if ($LASTEXITCODE -ne 0) { throw "electron-updater package is missing from app.asar" }
+      - name: Verify updater metadata
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/latest.yml")) { throw "dist/latest.yml missing" }
+          if (!(Get-ChildItem "dist" -Filter "*.blockmap")) { throw "blockmap missing" }
+          Get-Content "dist/latest.yml"
+      - name: Upload installer and updater metadata
         uses: actions/upload-artifact@v4
         with:
-          name: balBul-Windows-Installer
+          name: balBul-Windows-Installer-v1.0.2
           path: |
             dist/balBul-Setup.exe
             dist/latest.yml
             dist/*.blockmap
           if-no-files-found: error
           retention-days: 30
-      - name: Publish balBul v1.0.1 release
+      - name: Publish balBul v1.0.2 release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.1
+          tag_name: v1.0.2
           target_commitish: main
-          name: balBul v1.0.1
-          generate_release_notes: true
+          name: balBul v1.0.2
+          body: |
+            balBul v1.0.2 fixes the Windows startup crash caused by electron-updater not being packaged.
+            Includes the Windows installer and auto-update metadata.
           files: |
             dist/balBul-Setup.exe
             dist/latest.yml
