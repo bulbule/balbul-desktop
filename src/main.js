@@ -1,11 +1,12 @@
 'use strict';
 // "Otak" balBul: jendela karakter, dashboard, penyimpanan tugas, dan penjadwal pengingat.
 const {
-  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage, safeStorage,
+  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage, safeStorage, dialog,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { autoUpdater } = require('electron-updater');
 
 app.setAppUserModelId('com.balbul.desktop'); // wajib di Windows supaya notifikasi muncul
 
@@ -637,6 +638,25 @@ app.whenReady().then(() => {
 
   createTray();
   createCharacterWindow();
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('error', (err) => console.error('Auto-update gagal:', err));
+    autoUpdater.on('update-downloaded', async (info) => {
+      const result = await dialog.showMessageBox({
+        type: 'info',
+        title: 'Update balBul siap',
+        message: `balBul versi ${info.version} sudah siap dipasang.`,
+        detail: 'Simpan pekerjaanmu. balBul akan dimulai ulang untuk menyelesaikan update.',
+        buttons: ['Update sekarang', 'Nanti saja'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (result.response === 0) autoUpdater.quitAndInstall();
+    });
+    setTimeout(() => autoUpdater.checkForUpdates().catch(err => console.error('Cek update gagal:', err)), 15000);
+    setInterval(() => autoUpdater.checkForUpdates().catch(err => console.error('Cek update gagal:', err)), 6 * 60 * 60 * 1000);
+  }
   setInterval(tick, 10000);
   setTimeout(tick, 2000);
   if (firstRun) showDashboard();
