@@ -18,7 +18,7 @@ function updateChatNavDot(){const nav=document.querySelector('.nav[data-panel="c
 function playIncomingSound(){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext ||= new Ctx();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.setValueAtTime(880,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(660,audioContext.currentTime+.12);gain.gain.setValueAtTime(.0001,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.08,audioContext.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.2);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.21);}catch(_){}}
 function toggleChatSound(){soundEnabled=!soundEnabled;localStorage.setItem('balbul-chat-sound',soundEnabled?'on':'off');updateSoundButton();if(soundEnabled)playIncomingSound();}
 function updateSoundButton(){const b=$('#chatSoundToggle');if(b){b.textContent=soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati';b.classList.toggle('sound-off',!soundEnabled);b.setAttribute('aria-pressed',String(soundEnabled));}}
-function receiveIncomingMessage(message){if(!message?.id||seenMessageIds.has(message.id))return;seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);if(message.sender_id===user?.id)return;playIncomingSound();if(activeConversation?.id===message.conversation_id){appendMessage(message);return;}setUnread(message.conversation_id,true);}
+function receiveIncomingMessage(message){if(!message?.id||seenMessageIds.has(message.id))return;seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);if(message.sender_id===user?.id)return;playIncomingSound();if(activeConversation?.id===message.conversation_id&&!appView.classList.contains('hidden')&&!$('#activeChat').classList.contains('hidden')){appendMessage(message);return;}setUnread(message.conversation_id,true);}
 
 async function explainNetworkFailure() {
   if (!navigator.onLine) return 'Koneksi internet browser sedang offline. Sambungkan internet lalu coba lagi.';
@@ -268,7 +268,7 @@ async function loadMessages(id){
   if(error)return alert(error.message);
   $('#messages').replaceChildren();(data||[]).forEach(appendMessage);renderAllReadStatuses();$('#messages').scrollTop=$('#messages').scrollHeight;
 }
-function getPeerReadAt(){return conversationMembers.filter(m=>m.user_id!==user?.id).map(m=>m.last_read_at).filter(Boolean).sort().at(-1)||null;}
+function getPeerReadAt(){const peers=conversationMembers.filter(m=>m.user_id!==user?.id);if(!peers.length||peers.some(m=>!m.last_read_at))return null;return peers.map(m=>m.last_read_at).sort()[0]||null;}
 function setMessageStatus(el,status){
   if(!el)return;el.dataset.status=status;
   let meta=el.querySelector('.message-meta');
@@ -307,10 +307,11 @@ function receiveConversationMessage(message){
   if(!message?.id||seenMessageIds.has(message.id))return;
   seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);
   if(message.sender_id===user.id){appendMessage(message);return;}
+  if(appView.classList.contains('hidden')||$('#activeChat').classList.contains('hidden')){setUnread(message.conversation_id,true);playIncomingSound();return;}
   appendMessage(message);playIncomingSound();
 }
 async function markConversationRead(conversationId){
-  if(!user||!conversationId||document.visibilityState==='hidden')return;
+  if(!user||!conversationId||document.visibilityState==='hidden'||appView.classList.contains('hidden')||$('#activeChat').classList.contains('hidden')||activeConversation?.id!==conversationId)return;
   const now=new Date().toISOString();
   const {error}=await supabase.from('conversation_members').update({last_read_at:now}).eq('conversation_id',conversationId).eq('user_id',user.id);
   if(!error){const me=conversationMembers.find(m=>m.user_id===user.id);if(me)me.last_read_at=now;}
@@ -334,3 +335,7 @@ $('#messageForm').addEventListener('submit',async e=>{
   if(error){setMessageStatus(el,'failed');el.querySelector('.delivery-status').addEventListener('click',()=>retryWebMessage(el,body,conversationId));el.querySelector('.delivery-status').title=error.message;return;}
   el.dataset.id=data.id;el.dataset.createdAt=data.created_at;el.dataset.timeLabel=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(el,'sent');renderAllReadStatuses();
 });
+
+// When the user returns to the active conversation, refresh the read receipt.
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&activeConversation)markConversationRead(activeConversation.id);});
+window.addEventListener('focus',()=>{if(activeConversation)markConversationRead(activeConversation.id);});
