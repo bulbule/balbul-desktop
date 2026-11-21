@@ -31,7 +31,19 @@ let audioContext=null;
 function playIncomingSound(){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext ||= new Ctx();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type='sine';osc.frequency.setValueAtTime(880,audioContext.currentTime);osc.frequency.exponentialRampToValueAtTime(660,audioContext.currentTime+.12);gain.gain.setValueAtTime(.0001,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.08,audioContext.currentTime+.015);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.2);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+.21);}catch(_){}}
 function toggleChatSound(){soundEnabled=!soundEnabled;localStorage.setItem('balbul-chat-sound',soundEnabled?'on':'off');updateSoundButton();if(soundEnabled)playIncomingSound();}
 function updateSoundButton(){const b=$('#desktop-chat-sound');if(b){b.textContent=soundEnabled?'♫ Bunyi aktif':'♫ Bunyi mati';b.classList.toggle('sound-off',!soundEnabled);b.setAttribute('aria-pressed',String(soundEnabled));}}
-function receiveDesktopIncoming(message){if(!message?.id||seenMessageIds.has(message.id))return;seenMessageIds.add(message.id);if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);if(message.sender_id===cloudUser?.id)return;playIncomingSound();if(activeConversation?.id===message.conversation_id){appendCloudMessage(message);return;}updateChatUnread(message.conversation_id,true);const peer=conversations.find(c=>c.id===message.conversation_id)?.other?.[0];api.notifyChat({conversationId:message.conversation_id,title:peer?.display_name||'Pesan baru',body:message.body});}
+function receiveDesktopIncoming(message){
+  if(!message?.id||seenMessageIds.has(message.id))return;
+  seenMessageIds.add(message.id);
+  if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);
+  if(message.sender_id===cloudUser?.id)return;
+  const sameChat=activeConversation?.id===message.conversation_id;
+  const dashboardVisible=document.visibilityState==='visible';
+  if(sameChat&&dashboardVisible){appendCloudMessage(message);return;}
+  playIncomingSound();
+  updateChatUnread(message.conversation_id,true);
+  const peer=conversations.find(c=>c.id===message.conversation_id)?.other?.[0];
+  api.notifyChat({conversationId:message.conversation_id,title:peer?.display_name||'Pesan baru',body:message.body});
+}
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
 function h(tag, props = {}, ...kids) {
