@@ -44,11 +44,17 @@ function applyLook() {
 }
 
 // ---------- ekspresi ----------
+let spriteToken = 0;
+let curColor = null;
 function setState(state) {
   currentState = SPRITES.includes(state) ? state : 'idle';
   const data = window.EYES && window.EYES[currentState];
   const useEyes = (tracking || document.body.classList.contains('lifted')) && !!data;
-  img.src = `../../assets/sprites/${currentState}${useEyes ? '-noeyes' : ''}.png`;
+  const token = ++spriteToken;
+  const fallback = `../../assets/sprites/${currentState}${useEyes ? '-noeyes' : ''}.png`;
+  api.getSprite(currentState, useEyes).then((url) => {
+    if (token === spriteToken) img.src = url || fallback;
+  }).catch(() => { if (token === spriteToken) img.src = fallback; });
   body.className = `st-${currentState}`;
   eyeEls.forEach((el, i) => {
     const e = useEyes ? data.eyes[i] : null;
@@ -84,9 +90,17 @@ function applySettings(s) {
   stage.style.opacity = String(s.opacity / 100);
   const was = tracking;
   tracking = !!s.trackCursor;
+  const colorChanged = s.color && s.color !== curColor;
+  if (s.color && window.balbulColor) {
+    const t = window.balbulColor.theme(s.color);
+    const st = document.documentElement.style;
+    st.setProperty('--accent', t.accent); st.setProperty('--accent-2', t.accent2);
+    st.setProperty('--eye', t.eye); st.setProperty('--glow', t.glow);
+    curColor = s.color;
+  }
   document.body.classList.toggle('tracking', tracking);
   if (!tracking) look = { x: 0, y: 0 };
-  if (was !== tracking) setState(currentState);
+  if (was !== tracking || colorChanged) setState(currentState);
   else applyLook();
 }
 

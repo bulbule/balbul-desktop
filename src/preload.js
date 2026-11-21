@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('balbul', {
 
   // pengaturan
   getSettings: () => ipcRenderer.invoke('settings:get'),
+  getSprite: (name, noeyes) => ipcRenderer.invoke('sprite:get', name, !!noeyes),
+  getAvatar: () => ipcRenderer.invoke('avatar:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 
   // karakter

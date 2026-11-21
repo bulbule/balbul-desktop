@@ -261,7 +261,11 @@ body:not(.authenticated) #sidebar { display: none; }
 .cloud-list { display:flex; flex-direction:column; gap:8px; }
 .cloud-person { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
 .cloud-person:last-child { border-bottom:0; }
-.cloud-avatar { width:36px; height:36px; flex:none; display:grid; place-items:center; border-radius:50%; color:#05232d; background:var(--accent); font-weight:800; }
+.cloud-avatar { width:36px; height:36px; flex:none; display:grid; place-items:center; border-radius:50%; font-size:0; color:transparent; background:var(--panel-2) var(--avatar-img, none) center 55%/88% no-repeat; border:2px solid var(--accent); box-sizing:border-box; }
+.color-ctl { display:flex; align-items:center; gap:8px; }
+.color-ctl input[type="color"] { width:42px; height:32px; padding:0; border:1px solid var(--line); border-radius:8px; background:var(--panel-2); cursor:pointer; }
+.color-dot { width:24px; height:24px; border-radius:50%; border:2px solid var(--line); cursor:pointer; padding:0; }
+.color-dot:hover { border-color:var(--text); }
 .cloud-person-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
 .cloud-person-info small { font-size:11px; }
 .cloud-empty { padding:22px; color:var(--muted); text-align:center; border:1px dashed var(--line); border-radius:10px; }

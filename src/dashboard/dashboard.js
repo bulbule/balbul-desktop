@@ -198,7 +198,30 @@ function renderTasksView() {
       h('button', { class: 'add-btn alt', type: 'button', onclick: () => openForm(null, 'reminder') }, '+  Tambah Pengingat')));
 
   const allDone = view === 'today' && countable.length > 0 && done === countable.length;
-  $('#side-sprite').src = `../../assets/sprites/${allDone ? 'proud' : 'idle'}.png`;
+  setSprite($('#side-sprite'), allDone ? 'proud' : 'idle');
+}
+
+// warna balBul: aksen tampilan + ikon avatar mengikuti warna pilihan
+function applyTheme(s) {
+  if (!s || !s.color || !window.balbulColor) return;
+  const t = window.balbulColor.theme(s.color);
+  const st = document.documentElement.style;
+  st.setProperty('--accent', t.accent);
+  st.setProperty('--accent-2', t.accent2);
+  refreshSprites();
+  api.getAvatar().then((url) => { if (url) st.setProperty('--avatar-img', `url("${url}")`); }).catch(() => {});
+}
+
+// gambar balBul di dashboard selalu memakai warna pilihan
+const spriteNow = new WeakMap();
+function setSprite(img, name) {
+  spriteNow.set(img, name);
+  api.getSprite(name, false).then((url) => { if (url && spriteNow.get(img) === name) img.src = url; }).catch(() => {});
+}
+function refreshSprites() {
+  document.querySelectorAll('.brand-img').forEach((i) => setSprite(i, 'idle'));
+  const side = $('#side-sprite');
+  if (side) setSprite(side, spriteNow.get(side) || 'idle');
 }
 
 function settingRow(name, hint, control) {
@@ -228,6 +251,17 @@ function renderSettingsView() {
   const time = (key) => h('input', {
     type: 'time', value: s[key], onchange: (e) => { if (e.target.value) api.setSettings({ [key]: e.target.value }); },
   });
+  const quick = [['#35e0ff', 'Biru'], ['#ff5fa8', 'Pink'], ['#9b59ff', 'Ungu'], ['#ffc933', 'Gold'], ['#f5f0e1', 'Off-white']];
+  const picker = h('input', {
+    type: 'color', value: window.balbulColor.normalizeHex(s.color) || '#35e0ff', title: 'Pilih warna',
+    onchange: (e) => api.setSettings({ color: e.target.value }),
+  });
+  const colorCtl = h('div', { class: 'color-ctl' }, picker,
+    quick.map(([c, name]) => {
+      const dot = h('button', { type: 'button', class: 'color-dot', title: name, onclick: () => api.setSettings({ color: c }) });
+      dot.style.background = c;
+      return dot;
+    }));
   const encourage = h('select', { onchange: (e) => api.setSettings({ encourageEveryMin: Number(e.target.value) }) },
     [[0, 'Mati'], [30, 'Tiap 30 menit'], [60, 'Tiap 1 jam'], [120, 'Tiap 2 jam']].map(([v, label]) =>
       h('option', { value: String(v), selected: v === s.encourageEveryMin }, label)));
@@ -236,6 +270,7 @@ function renderSettingsView() {
     h('div', { class: 'head' }, h('h1', {}, 'Pengaturan')),
     settingRow('Tampilkan karakter', 'Karakter balBul melayang di desktop.', check('showCharacter')),
     settingRow('Mata & badan ikut kursor', 'balBul diam di tempat, tapi matanya melirik dan badannya condong ke arah kursor.', check('trackCursor')),
+    settingRow('Warna balBul', 'Pilih warna bebas. Karakter, gelembung, tampilan ini, dan ikon chat ikut berubah.', colorCtl),
     settingRow('Ukuran karakter', null, [size, sizeVal]),
     settingRow('Transparansi', null, [opacity, opacityVal]),
     settingRow('Posisi karakter', 'Tarik karakter dengan mouse untuk memindahkan.',
@@ -371,6 +406,7 @@ api.on('tasks-changed', (list) => {
 });
 api.on('settings-changed', (s) => {
   settings = s;
+  applyTheme(s);
   if (view === 'settings') render();
 });
 
@@ -746,6 +782,7 @@ window.addEventListener('balbul-auth-ready', async () => {
     const [list, s] = await Promise.all([api.listTasks(), api.getSettings()]);
     tasks = list;
     settings = s;
+    applyTheme(s);
     dashboardReady = true;
     render();
   } catch (error) {

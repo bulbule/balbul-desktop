@@ -1,4 +1,4 @@
-:root { --size: 150px; }
+:root { --size: 150px; --accent: #35e0ff; --accent-2: #7aeaff; --eye: #aaf7f8; --glow: rgba(53, 224, 255, 0.75); }
 
 html, body {
   margin: 0;
@@ -51,9 +51,9 @@ html, body {
   position: absolute;
   display: none;
   pointer-events: none;
-  background: #aaf7f8;
+  background: var(--eye);
   border-radius: 45%;
-  box-shadow: 0 0 6px 1px rgba(53, 224, 255, 0.75);
+  box-shadow: 0 0 6px 1px var(--glow);
   transition: transform 0.1s ease-out;
 }
 .eye.on { display: block; }
@@ -72,7 +72,7 @@ html, body {
   padding: 10px 14px;
   background: #f4fbff;
   color: #0b2230;
-  border: 2px solid #35e0ff;
+  border: 2px solid var(--accent);
   border-radius: 14px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   font-size: 14px;
@@ -88,8 +88,8 @@ html, body {
   width: 14px;
   height: 14px;
   background: #f4fbff;
-  border-right: 2px solid #35e0ff;
-  border-bottom: 2px solid #35e0ff;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
   transform: translateX(-50%) rotate(45deg);
 }
 #bubble.hidden, #bubble-actions.hidden { display: none; }
@@ -103,12 +103,12 @@ html, body {
   font: inherit;
   font-size: 12px;
   color: #04202c;
-  background: #35e0ff;
+  background: var(--accent);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
 }
-#bubble-actions button:hover { background: #7aeaff; }
+#bubble-actions button:hover { background: var(--accent-2); }
 #btn-snooze { background: #cfe9f2 !important; }
 
 /* ---------- animasi per ekspresi ---------- */
@@ -139,4 +139,4 @@ html, body {
 .st-error     { animation: glitch 2s steps(1) infinite; }
 .st-offline   { animation: none; }
 
-#body{transition:transform .16s ease}.facing-left #body{transform:scaleX(-1)}.lifted #char{transform:translateY(3px) scale(.98);filter:brightness(1.12)}.lifted .eye{transform:scaleY(.48) translateY(2px)!important}#bubble-reply{display:flex;gap:6px;margin-top:9px}#bubble-reply.hidden{display:none}#bubble-reply input{min-width:0;flex:1;box-sizing:border-box;border:1px solid #b8e9f2;border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;color:#0b2230;background:#fff;user-select:text}#bubble-reply button{width:32px;border:0;border-radius:8px;color:#04202c;background:#35e0ff;font-size:17px;cursor:pointer}
+#body{transition:transform .16s ease}.facing-left #body{transform:scaleX(-1)}.lifted #char{transform:translateY(3px) scale(.98);filter:brightness(1.12)}.lifted .eye{transform:scaleY(.48) translateY(2px)!important}#bubble-reply{display:flex;gap:6px;margin-top:9px}#bubble-reply.hidden{display:none}#bubble-reply input{min-width:0;flex:1;box-sizing:border-box;border:1px solid #b8e9f2;border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;color:#0b2230;background:#fff;user-select:text}#bubble-reply button{width:32px;border:0;border-radius:8px;color:#04202c;background:var(--accent);font-size:17px;cursor:pointer}

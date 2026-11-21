@@ -17,6 +17,7 @@ if (!app.requestSingleInstanceLock()) {
 
 // ---------------------------------------------------------------- konstanta
 const ROOT = path.join(__dirname, '..');
+const colorLib = require('./color');
 const sprite = (name) => path.join(ROOT, 'assets', 'sprites', `${name}.png`);
 const WIN_W = 340; // lebar jendela karakter
 const BUBBLE_H = 150; // ruang di atas karakter untuk bubble chat
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS = {
   encourageEveryMin: 60, // 0 = mati
   autoStart: false,
   trackCursor: false, // mata & badan balBul mengikuti kursor
+  color: '#35e0ff', // warna balBul & aksen tampilan (biru = asli)
   x: null,
   y: null,
 };
@@ -244,6 +246,7 @@ function sanitizeSettings(p) {
   if ('showCharacter' in p) out.showCharacter = !!p.showCharacter;
   if ('autoStart' in p) out.autoStart = !!p.autoStart;
   if ('trackCursor' in p) out.trackCursor = !!p.trackCursor;
+  if ('color' in p && colorLib.normalizeHex(p.color)) out.color = colorLib.normalizeHex(p.color);
   if ('encourageEveryMin' in p) out.encourageEveryMin = num(p.encourageEveryMin, 0, 240);
   if ('quietStart' in p && time(p.quietStart)) out.quietStart = p.quietStart;
   if ('quietEnd' in p && time(p.quietEnd)) out.quietEnd = p.quietEnd;
@@ -579,6 +582,30 @@ ipcMain.handle('tasks:toggle', (_e, id) => toggleTask(id));
 ipcMain.handle('tasks:delete', (_e, id) => deleteTask(id));
 ipcMain.handle('tasks:snooze', (_e, id, minutes) => snoozeTask(id, minutes));
 ipcMain.handle('tasks:ack', (_e, id) => ackTask(id));
+// ---- sprite berwarna: biru asli diputar ke warna pilihan, hasilnya disimpan sementara (cache)
+const SPRITE_NAMES = ['idle', 'happy', 'reminder', 'urgent', 'marah', 'thinking', 'working', 'proud',
+  'encourage', 'wait', 'sleep', 'afk', 'overtime', 'error', 'offline'];
+const spriteCache = new Map();
+function coloredDataUrl(file) {
+  const key = file + '|' + settings.color;
+  if (spriteCache.has(key)) return spriteCache.get(key);
+  let img = nativeImage.createFromPath(file);
+  if (!img.isEmpty() && colorLib.normalizeHex(settings.color) !== colorLib.DEFAULT) {
+    const { width, height } = img.getSize();
+    const buf = Buffer.from(img.toBitmap());
+    colorLib.recolorPixels(buf, settings.color, 'bgra');
+    img = nativeImage.createFromBitmap(buf, { width, height });
+  }
+  const url = img.toDataURL();
+  if (spriteCache.size > 80) spriteCache.clear();
+  spriteCache.set(key, url);
+  return url;
+}
+ipcMain.handle('sprite:get', (_e, name, noeyes) => {
+  if (!SPRITE_NAMES.includes(name)) return null;
+  return coloredDataUrl(sprite(name + (noeyes ? '-noeyes' : '')));
+});
+ipcMain.handle('avatar:get', () => coloredDataUrl(path.join(ROOT, 'assets', 'avatar.png')));
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => applySettings(patch));
 
