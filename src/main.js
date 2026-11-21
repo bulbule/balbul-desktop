@@ -640,7 +640,7 @@ ipcMain.on('app:notify-chat', (_e, payload) => {
   const title = String(payload.title || 'Pesan baru').slice(0, 120);
   const body = String(payload.body || '').slice(0, 500);
   if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:chat-message', { conversationId: payload.conversationId, sender: title, body });
-  setOverride('thinking', `Pesan baru dari ${title}`, 18000, { sound: true });
+
   if (!Notification.isSupported()) return;
   try {
     const n = new Notification({ title: `Pesan baru · ${title}`, body, icon: nativeImage.createFromPath(sprite('idle')) });
