@@ -25,7 +25,14 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build Windows installer
-        run: npm run dist:win -- --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            npm run dist:win -- --publish always
+          else
+            npm run dist:win -- --publish never
+          fi
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -33,10 +40,3 @@ jobs:
           path: dist/balBul-Setup.exe
           if-no-files-found: error
           retention-days: 30
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: balBul ${{ github.ref_name }}
-          generate_release_notes: true
-          files: dist/balBul-Setup.exe
