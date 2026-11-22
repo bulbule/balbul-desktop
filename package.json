@@ -1,6 +1,6 @@
 {
   "name": "balbul-desktop",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "balBul - asisten desktop pixel art untuk pengingat dan to-do list",
   "main": "src/main.js",
   "scripts": {
@@ -72,7 +72,8 @@
       "icon": "assets/icon-mac.png",
       "identity": null,
       "artifactName": "balBul-${version}-mac-${arch}.${ext}"
-    }
+    },
+    "afterPack": "scripts/adhoc-sign.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
