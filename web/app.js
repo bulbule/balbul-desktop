@@ -6,6 +6,10 @@ const $ = (s) => document.querySelector(s);
 const landingView = $('#landingView'), authView = $('#authView'), appView = $('#appView');
 let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
 let conversations = [], friends = [], conversationMembers = [];
+let pendingChatId = new URLSearchParams(location.search).get('chat');
+if(pendingChatId)try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){}
+function openPendingChat(){if(!pendingChatId)return;const c=conversations.find(x=>x.id===pendingChatId);if(!c)return;pendingChatId=null;hubPanel('chats');openConversation(c);}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='open-chat'&&e.data.chat){pendingChatId=e.data.chat;if(conversations.some(x=>x.id===pendingChatId))openPendingChat();else loadConversations().catch(()=>{});}});
 const openingDirectIds = new Set();
 let unreadChats = {}, soundEnabled = localStorage.getItem('balbul-chat-sound') !== 'off', audioContext = null, globalMessageChannel = null;
 const seenMessageIds = new Set();
@@ -214,6 +218,7 @@ async function loadConversations(){
   });
   if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   renderConversations();
+  openPendingChat();
 }
 function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'')+(unreadChats[c.id]?' has-unread':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>'+(unreadChats[c.id]?'<i class="unread-dot" aria-label="Pesan belum dibaca"></i>':'');row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
 async function openDirect(p,button){

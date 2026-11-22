@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       title: sender?.display_name || 'Pesan baru',
       body: String(m.body).slice(0, 140),
       tag: 'chat-' + m.conversation_id,
-      data: { url: './?chat=' + m.conversation_id },
+      data: { url: './?chat=' + m.conversation_id, chat: m.conversation_id },
     };
     for (const s of subs) if (await send(s, payload)) sent++;
   }

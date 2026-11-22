@@ -17,13 +17,14 @@ self.addEventListener('push', event => {
 });
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const target = new URL(event.notification.data?.url || './', APP_SCOPE).href;
+  const data = event.notification.data || {};
+  const target = new URL(data.url || './', APP_SCOPE).href;
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
       if ('focus' in client && client.url.startsWith(APP_SCOPE)) {
         await client.focus();
-        if ('navigate' in client) await client.navigate(target);
+        if (data.chat) client.postMessage({ type: 'open-chat', chat: data.chat });
         return;
       }
     }
