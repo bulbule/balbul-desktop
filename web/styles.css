@@ -130,3 +130,37 @@
   .sidepanel .nav { font-size:10px; }
   .topbar-actions .ghost { padding:0 8px; font-size:11px; }
 }
+
+/* Fix mobile navigation tabs stretching to the full available row height */
+@media (max-width: 650px) {
+  .sidepanel {
+    display:grid;
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    grid-auto-rows:76px;
+    align-items:center;
+    align-content:start;
+    gap:5px;
+    min-height:0;
+  }
+  .sidepanel .nav {
+    align-self:center;
+    justify-self:stretch;
+    height:68px;
+    min-height:68px;
+    max-height:68px;
+    box-sizing:border-box;
+    padding:8px 2px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    line-height:1.15;
+  }
+  .sidepanel .nav.active {
+    height:68px;
+    min-height:68px;
+    max-height:68px;
+    box-shadow:inset 4px 0 #20bfd0;
+  }
+}
