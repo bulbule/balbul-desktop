@@ -20,6 +20,7 @@ self.addEventListener('notificationclick', event => {
   const data = event.notification.data || {};
   const target = new URL(data.url || './', APP_SCOPE).href;
   event.waitUntil((async () => {
+    try { const c = await caches.open('balbul-click'); await c.put('click', new Response(JSON.stringify({ chat: data.chat || null, panel: data.panel || null, t: Date.now() }))); } catch (_) {}
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
       if ('focus' in client && client.url.startsWith(APP_SCOPE)) {

@@ -10,7 +10,11 @@ let pendingChatId = new URLSearchParams(location.search).get('chat');
 if(pendingChatId)try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){}
 let pendingPanel = new URLSearchParams(location.search).get('panel');
 if(pendingPanel)try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){}
-function openPendingPanel(){if(!pendingPanel)return;const p=pendingPanel;pendingPanel=null;hubPanel(p);}
+function openPendingPanel(){if(!pendingPanel||!user)return;const p=pendingPanel;pendingPanel=null;hubPanel(p);}
+async function consumeClick(){try{const c=await caches.open('balbul-click');const r=await c.match('click');if(!r)return;await c.delete('click');const d=await r.json();if(Date.now()-d.t>90000)return;
+  if(d.chat){pendingChatId=d.chat;if(user&&conversations.some(x=>x.id===d.chat))openPendingChat();else if(user)loadConversations().catch(()=>{});}
+  else if(d.panel){pendingPanel=d.panel;openPendingPanel();}}catch(_){}}
+consumeClick();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')consumeClick();});
 function openPendingChat(){if(!pendingChatId)return;const c=conversations.find(x=>x.id===pendingChatId);if(!c)return;pendingChatId=null;hubPanel('chats');openConversation(c);}
 if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data?.type==='open-panel'&&e.data.panel){pendingPanel=e.data.panel;openPendingPanel();}if(e.data?.type==='open-chat'&&e.data.chat){pendingChatId=e.data.chat;if(conversations.some(x=>x.id===pendingChatId))openPendingChat();else loadConversations().catch(()=>{});}});
 const openingDirectIds = new Set();
