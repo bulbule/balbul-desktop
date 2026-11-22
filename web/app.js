@@ -347,7 +347,7 @@ function openChatRoomUi(){if(!phoneChat())return;$('#chatPanel').classList.add('
 function closeChatRoomUi(){$('#chatPanel').classList.remove('chat-open');document.body.classList.remove('chat-open');}
 $('#chatBack')?.addEventListener('click',closeChatRoomUi);
 const ICON_COPY=$('#copyCode')?.innerHTML||'';
-function hubPanel(name){closeChatRoomUi();for(const [k,s] of Object.entries({tasks:'#tasksPanel',chats:'#chatPanel',friends:'#friendsPanel',profile:'#profilePanel'}))$(s).classList.toggle('hidden',k!==name);document.querySelectorAll('.nav[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));if(name==='tasks')loadHubTasks();if(name==='profile')renderHubProfile();}
+function hubPanel(name){closeChatRoomUi();if(name==='profile')refreshPushUi();for(const [k,s] of Object.entries({tasks:'#tasksPanel',chats:'#chatPanel',friends:'#friendsPanel',profile:'#profilePanel'}))$(s).classList.toggle('hidden',k!==name);document.querySelectorAll('.nav[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));if(name==='tasks')loadHubTasks();if(name==='profile')renderHubProfile();}
 document.querySelectorAll('.nav[data-panel]').forEach(b=>b.addEventListener('click',()=>hubPanel(b.dataset.panel)));
 function renderHubProfile(){if(!profile)return;const n=profile.display_name||'BalBul User';$('#profileDisplayName').textContent=n;$('#profileEmail').textContent=user.email||'';$('#profileFriendCode').textContent=profile.friend_code||'';$('#profileAvatarLarge').textContent=n[0].toUpperCase();$('#profileNameInput').value=n;$('#profileUsernameInput').value=profile.username||'';}
 $('#profileForm').addEventListener('submit',async e=>{e.preventDefault();const display_name=$('#profileNameInput').value.trim(),username=$('#profileUsernameInput').value.trim().toLowerCase()||null,msg=$('#profileMessage');if(username&&!/^[a-z0-9_]{3,24}$/.test(username)){msg.textContent='Username 3–24 karakter: huruf, angka, underscore.';return;}const {data,error}=await supabase.from('profiles').update({display_name,username}).eq('id',user.id).select().single();if(error){msg.textContent=error.code==='23505'?'Username sudah dipakai.':error.message;return;}profile=data;$('#helloName').textContent=display_name;$('#myName').textContent=display_name;$('#myAvatar').textContent=display_name[0].toUpperCase();msg.textContent='Profil diperbarui.';});
@@ -361,6 +361,42 @@ function renderHubTasks(){const pending=personalTasks.filter(t=>t.status!=='comp
 async function startPersonalHubSync(){if(!user)return;await loadHubTasks();if(taskChannel)supabase.removeChannel(taskChannel);taskChannel=supabase.channel('balbul-tasks-'+user.id).on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'owner_id=eq.'+user.id},()=>loadHubTasks()).subscribe();}
 supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user){setTimeout(()=>startPersonalHubSync(),0);}});
 if(user)startPersonalHubSync();
+
+
+// ---- Web Push (notifikasi chat + reminder di HP / browser) ----
+const VAPID_PUBLIC='BJDJ-z0pniySysQodWexW7ApIBMIY5izAZE-tTe5ZiIkLr7FCiqA1FhAopfjkJAnM8x8tFgN9IuNSRy-6yL5nwA';
+const pushKey=()=>{const p='='.repeat((4-VAPID_PUBLIC.length%4)%4),b=(VAPID_PUBLIC+p).replace(/-/g,'+').replace(/_/g,'/'),r=atob(b);return Uint8Array.from(r,c=>c.charCodeAt(0));};
+const isStandalone=()=>window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
+async function currentPushSub(){try{const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch(_){return null;}}
+async function refreshPushUi(){
+  const hint=$('#pushHint'),btn=$('#pushToggle');if(!hint||!btn)return;
+  btn.disabled=false;
+  if(!('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window)){
+    btn.classList.add('hidden');
+    hint.textContent=isIOS()?'Di iPhone: buka web ini lewat Safari, tekan Share → Add to Home Screen, lalu buka balBul dari ikon di Home Screen. Setelah itu tombol notifikasi muncul di sini.':'Browser ini belum mendukung notifikasi.';return;}
+  btn.classList.remove('hidden');
+  if(Notification.permission==='denied'){btn.disabled=true;hint.textContent='Notifikasi diblokir. Aktifkan lagi lewat Pengaturan → Notifikasi → balBul.';btn.textContent='Notifikasi diblokir';return;}
+  const sub=await currentPushSub();
+  btn.textContent=sub?'Matikan notifikasi':'Aktifkan notifikasi';
+  hint.textContent=sub?'Notifikasi aktif di perangkat ini: pesan chat dan reminder akan masuk walau web ditutup.':'Dapat notifikasi pesan chat dan reminder di perangkat ini.';
+}
+$('#pushToggle')?.addEventListener('click',async()=>{
+  const btn=$('#pushToggle'),hint=$('#pushHint');btn.disabled=true;
+  try{
+    const existing=await currentPushSub();
+    if(existing){await supabase.from('push_subscriptions').delete().eq('endpoint',existing.endpoint);await existing.unsubscribe();}
+    else{
+      if(await Notification.requestPermission()!=='granted')throw new Error('Izin notifikasi tidak diberikan.');
+      const reg=await navigator.serviceWorker.ready;
+      const sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushKey()});
+      await supabase.from('push_subscriptions').delete().eq('endpoint',sub.endpoint);
+      const {error}=await supabase.from('push_subscriptions').insert({user_id:user.id,endpoint:sub.endpoint,subscription:sub.toJSON(),device_label:(isIOS()?'iPhone':'Browser')+(isStandalone()?' (app)':'')});
+      if(error)throw error;
+    }
+  }catch(e){hint.textContent='Gagal: '+(e.message||e);}
+  await refreshPushUi();
+});
 
 // Install lightweight PWA service worker for Home Screen and incoming push events.
 if ('serviceWorker' in navigator) {

@@ -167,3 +167,5 @@
 
 .app-version{text-align:center;font-size:12px;color:#8aa3ad;margin:18px 0 6px}
 @media(max-width:650px){.workspace{min-height:0;align-content:start}}
+
+.push-card{margin-top:18px;padding-top:16px;border-top:1px solid #e1eef2;display:grid;gap:8px}.push-card p{margin:0;font-size:13px;color:#6b8791;line-height:1.5}.push-card button{justify-self:start}
