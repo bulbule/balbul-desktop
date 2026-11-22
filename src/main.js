@@ -376,6 +376,7 @@ function updateCursorPolling() {
 // ---------------------------------------------------------------- notifikasi + penjadwal
 function notify(title, body) {
   try {
+    if (process.platform === 'darwin' && app.dock) { try { app.dock.bounce('informational'); } catch (_e) {} }
     if (!Notification.isSupported()) return;
     const n = new Notification({ title, body, icon: nativeImage.createFromPath(sprite('idle')) });
     n.on('click', showDashboard);
@@ -668,6 +669,7 @@ ipcMain.on('app:notify-chat', (_e, payload) => {
   const body = String(payload.body || '').slice(0, 500);
   if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:chat-message', { conversationId: payload.conversationId, sender: title, body });
 
+  if (process.platform === 'darwin' && app.dock) { try { app.dock.bounce('informational'); } catch (_e) {} } // fallback kalau izin notifikasi Mac belum aktif
   if (!Notification.isSupported()) return;
   try {
     const n = new Notification({ title: `Pesan baru · ${title}`, body, icon: nativeImage.createFromPath(sprite('idle')) });
