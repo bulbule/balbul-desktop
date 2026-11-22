@@ -5,6 +5,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const SITE = 'https://bulbule.github.io/balbul-desktop/';
+const errors: string[] = [];
 
 async function subsFor(userIds: string[]) {
   if (!userIds.length) return [];
@@ -18,6 +19,7 @@ async function send(sub: any, payload: unknown) {
   } catch (e: any) {
     if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from('push_subscriptions').delete().eq('id', sub.id);
     else console.error('push failed', e?.statusCode, e?.body);
+    errors.push('send:' + e?.statusCode);
     return false;
   }
 }
@@ -61,5 +63,5 @@ Deno.serve(async (req) => {
       }
     }
   }
-  return Response.json({ sent });
+  return Response.json({ sent, errors });
 });
