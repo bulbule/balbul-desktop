@@ -37,7 +37,7 @@ function receiveDesktopIncoming(message){
   if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);
   if(message.sender_id===cloudUser?.id)return;
   const sameChat=activeConversation?.id===message.conversation_id;
-  const dashboardVisible=document.visibilityState==='visible';
+  const dashboardVisible=document.visibilityState==='visible'&&document.hasFocus();
   // Pesan tetap dimasukkan ke chat yang sedang terbuka, walau dashboard sedang tersembunyi.
   if(sameChat){appendCloudMessage(message);if(dashboardVisible)return;}
   playIncomingSound();
