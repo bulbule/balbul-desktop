@@ -154,7 +154,7 @@ if (recovering) { startRecovery(); }
 else if (initial.session?.user?.email_confirmed_at) { try { await enterApp(initial.session.user); } catch (e) { notice(e.message, true); } }
 if (location.hash.includes('error_description')) notice(decodeURIComponent(location.hash.split('error_description=')[1]?.replaceAll('+',' ') || 'Verifikasi gagal.'), true);
 
-$('#copyCode').addEventListener('click', async () => { await navigator.clipboard.writeText(profile.friend_code); $('#copyCode').textContent='✓'; setTimeout(()=>$('#copyCode').textContent='⧉',1200); });
+$('#copyCode').addEventListener('click', async () => { await navigator.clipboard.writeText(profile.friend_code); $('#copyCode').textContent='✓'; setTimeout(()=>{$('#copyCode').innerHTML=ICON_COPY;},1200); });
 
 document.querySelectorAll('.nav').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x===b));
@@ -226,12 +226,12 @@ async function openDirect(p,button){
     if(error)throw error;
     await loadConversations();
     const conversation=conversations.find(x=>x.id===conversationId)||conversations.find(x=>x.kind==='direct'&&x.other.some(y=>y.id===p.id));
-    if(conversation)await openConversation(conversation);
+    hubPanel('chats');if(conversation)await openConversation(conversation);
   }catch(err){alert(err.message||'Gagal membuka chat.');}
   finally{openingDirectIds.delete(p.id);if(button){button.disabled=false;button.textContent=original||'Chat';button.classList.remove('is-loading');}}
 }
 async function openConversation(c){
-  activeConversation=c;setUnread(c.id,false);
+  activeConversation=c;setUnread(c.id,false);openChatRoomUi();
   $('#emptyChat').classList.add('hidden');$('#activeChat').classList.remove('hidden');
   const p=c.other[0];$('#chatTitle').textContent=p?.display_name||c.title||'Percakapan';$('#chatAvatar').textContent=(p?.display_name||'b')[0].toUpperCase();
   let leave=$('#leaveChat');if(!leave){leave=document.createElement('button');leave.id='leaveChat';leave.className='chat-leave-btn';leave.type='button';leave.textContent='Hapus chat';$('#activeChat .room-head').append(leave);leave.onclick=leaveCurrentConversation;}
@@ -260,7 +260,7 @@ async function leaveCurrentConversation(){
   if(error){alert(error.message);return;}
   if(messageChannel){await supabase.removeChannel(messageChannel);messageChannel=null;}
   if(receiptChannel){await supabase.removeChannel(receiptChannel);receiptChannel=null;}
-  conversationMembers=[];activeConversation=null;$('#activeChat').classList.add('hidden');$('#emptyChat').classList.remove('hidden');
+  conversationMembers=[];activeConversation=null;closeChatRoomUi();$('#activeChat').classList.add('hidden');$('#emptyChat').classList.remove('hidden');
   await loadConversations();
 }
 async function loadMessages(id){
@@ -341,7 +341,13 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('focus',()=>{if(activeConversation)markConversationRead(activeConversation.id);});
 
 let personalTasks=[],taskFilter='all',editingTaskId=null,taskChannel=null;
-function hubPanel(name){for(const [k,s] of Object.entries({tasks:'#tasksPanel',chats:'#chatPanel',friends:'#friendsPanel',profile:'#profilePanel'}))$(s).classList.toggle('hidden',k!==name);document.querySelectorAll('.nav[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));if(name==='tasks')loadHubTasks();if(name==='profile')renderHubProfile();}
+// Di HP, ruang chat dibuka layar penuh supaya kolom ketik tidak tertutup toolbar browser.
+const phoneChat=()=>window.matchMedia('(max-width:650px)').matches;
+function openChatRoomUi(){if(!phoneChat())return;$('#chatPanel').classList.add('chat-open');document.body.classList.add('chat-open');}
+function closeChatRoomUi(){$('#chatPanel').classList.remove('chat-open');document.body.classList.remove('chat-open');}
+$('#chatBack')?.addEventListener('click',closeChatRoomUi);
+const ICON_COPY=$('#copyCode')?.innerHTML||'';
+function hubPanel(name){closeChatRoomUi();for(const [k,s] of Object.entries({tasks:'#tasksPanel',chats:'#chatPanel',friends:'#friendsPanel',profile:'#profilePanel'}))$(s).classList.toggle('hidden',k!==name);document.querySelectorAll('.nav[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));if(name==='tasks')loadHubTasks();if(name==='profile')renderHubProfile();}
 document.querySelectorAll('.nav[data-panel]').forEach(b=>b.addEventListener('click',()=>hubPanel(b.dataset.panel)));
 function renderHubProfile(){if(!profile)return;const n=profile.display_name||'BalBul User';$('#profileDisplayName').textContent=n;$('#profileEmail').textContent=user.email||'';$('#profileFriendCode').textContent=profile.friend_code||'';$('#profileAvatarLarge').textContent=n[0].toUpperCase();$('#profileNameInput').value=n;$('#profileUsernameInput').value=profile.username||'';}
 $('#profileForm').addEventListener('submit',async e=>{e.preventDefault();const display_name=$('#profileNameInput').value.trim(),username=$('#profileUsernameInput').value.trim().toLowerCase()||null,msg=$('#profileMessage');if(username&&!/^[a-z0-9_]{3,24}$/.test(username)){msg.textContent='Username 3–24 karakter: huruf, angka, underscore.';return;}const {data,error}=await supabase.from('profiles').update({display_name,username}).eq('id',user.id).select().single();if(error){msg.textContent=error.code==='23505'?'Username sudah dipakai.':error.message;return;}profile=data;$('#helloName').textContent=display_name;$('#myName').textContent=display_name;$('#myAvatar').textContent=display_name[0].toUpperCase();msg.textContent='Profil diperbarui.';});
