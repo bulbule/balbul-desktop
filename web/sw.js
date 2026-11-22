@@ -7,8 +7,8 @@ self.addEventListener('push', event => {
   const title = payload.title || 'balBul Reminder';
   const options = {
     body: payload.body || 'Ada pengingat untuk kamu.',
-    icon: new URL('./balbul-icon.svg', APP_SCOPE).href,
-    badge: new URL('./balbul-icon.svg', APP_SCOPE).href,
+    icon: new URL('./apple-touch-icon.png', APP_SCOPE).href,
+    badge: new URL('./apple-touch-icon.png', APP_SCOPE).href,
     tag: payload.tag || 'balbul-reminder',
     renotify: true,
     data: payload.data || { url: './' }
