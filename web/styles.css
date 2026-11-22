@@ -95,3 +95,38 @@
   .chat-panel.chat-open .composer input{font-size:16px} /* cegah iOS zoom saat mengetik */
   .bubble{max-width:84%}
 }
+
+/* Mobile usability fix: prevent clipped friend rows and keep the page touch-scrollable */
+@media (max-width: 650px) {
+  html, body { width:100%; min-width:0; overflow-x:hidden; overflow-y:auto; }
+  body.chat-open { overflow:hidden; }
+  .app-layout { width:100%; max-width:100%; min-height:100dvh; margin:0 auto; padding:18px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .topbar { display:flex; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+  .topbar > div:first-child { flex:1 1 100%; min-width:0; }
+  .topbar h1 { font-size:clamp(25px,7vw,32px); line-height:1.2; overflow-wrap:anywhere; }
+  .topbar-actions { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .topbar-actions .ghost { width:100%; min-width:0; height:44px; white-space:nowrap; }
+  .workspace { width:100%; min-width:0; grid-template-columns:minmax(0,1fr); overflow:visible; border-radius:20px; }
+  .sidepanel { width:100%; min-width:0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; padding:9px; overflow:visible; }
+  .sidepanel .nav { min-width:0; width:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:10px 2px; margin:0; border-radius:12px; font-size:11px; white-space:nowrap; }
+  .sidepanel .nav-icon { width:22px; height:22px; }
+  .content, .chat-panel, .chat-list, .chat-room { width:100%; min-width:0; }
+  .chat-panel { display:grid; grid-template-columns:minmax(0,1fr); min-height:0; }
+  .chat-list { padding:18px 14px; overflow:visible; }
+  .chat-list .list { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; width:100%; max-width:100%; overflow:visible !important; }
+  .chat-list .list-row { width:100%; min-width:0 !important; max-width:100%; box-sizing:border-box; padding:9px 7px; gap:8px; }
+  .chat-list .list-row .avatar { width:38px; height:38px; flex:0 0 38px; }
+  .chat-list .list-row .details { min-width:0; flex:1 1 0; }
+  .chat-list .list-row .details strong,
+  .chat-list .list-row .details small { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chat-room { min-height:0; }
+  .friends-panel, .tasks-panel, .profile-panel { width:100%; min-width:0; box-sizing:border-box; }
+  .task-stats { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .task-stat { min-width:0; }
+  .task-stat strong { font-size:21px; }
+}
+@media (max-width: 380px) {
+  .chat-list .list { grid-template-columns:minmax(0,1fr); }
+  .sidepanel .nav { font-size:10px; }
+  .topbar-actions .ghost { padding:0 8px; font-size:11px; }
+}
