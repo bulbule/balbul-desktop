@@ -164,3 +164,6 @@
     box-shadow:inset 4px 0 #20bfd0;
   }
 }
+
+.app-version{text-align:center;font-size:12px;color:#8aa3ad;margin:18px 0 6px}
+@media(max-width:650px){.workspace{min-height:0;align-content:start}}
