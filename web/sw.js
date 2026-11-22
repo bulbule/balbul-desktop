@@ -25,6 +25,7 @@ self.addEventListener('notificationclick', event => {
       if ('focus' in client && client.url.startsWith(APP_SCOPE)) {
         await client.focus();
         if (data.chat) client.postMessage({ type: 'open-chat', chat: data.chat });
+        if (data.panel) client.postMessage({ type: 'open-panel', panel: data.panel });
         return;
       }
     }

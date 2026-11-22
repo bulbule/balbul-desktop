@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
       for (const s of await subsFor(ids)) {
         const { error } = await sb.from('push_deliveries').insert({ task_id: t.id, endpoint: s.endpoint, due_at: t.due_at });
         if (error) continue; // already delivered (unique index)
-        if (await send(s, { title: 'Reminder balBul', body: t.title, tag: 'task-' + t.id, data: { url: './' } })) sent++;
+        if (await send(s, { title: 'Reminder balBul', body: t.title, tag: 'task-' + t.id, data: { url: './?panel=tasks', panel: 'tasks' } })) sent++;
       }
     }
   }
