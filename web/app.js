@@ -361,3 +361,11 @@ function renderHubTasks(){const pending=personalTasks.filter(t=>t.status!=='comp
 async function startPersonalHubSync(){if(!user)return;await loadHubTasks();if(taskChannel)supabase.removeChannel(taskChannel);taskChannel=supabase.channel('balbul-tasks-'+user.id).on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'owner_id=eq.'+user.id},()=>loadHubTasks()).subscribe();}
 supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user){setTimeout(()=>startPersonalHubSync(),0);}});
 if(user)startPersonalHubSync();
+
+// Install lightweight PWA service worker for Home Screen and incoming push events.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .catch(error => console.warn('balBul service worker:', error));
+  }, { once: true });
+}
