@@ -9,10 +9,16 @@
   "theme_color": "#071a37",
   "icons": [
     {
-      "src": "./balbul-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./icons/balbul-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./apple-touch-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
