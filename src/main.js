@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS = {
   color: '#35e0ff', // warna balBul & aksen tampilan (biru = asli)
   x: null,
   y: null,
+  edge: null,
 };
 
 // ---------------------------------------------------------------- state
@@ -55,6 +56,7 @@ let lastEncourage = Date.now();
 let pendingError = null;
 let dragStart = null;
 let bubbleBelow = false;
+let characterEdge = 'right';
 let shareQuitPending = false;
 const shareService = new ShareService({
   app,
@@ -277,6 +279,7 @@ function sanitizeSettings(p) {
   if ('quietEnd' in p && time(p.quietEnd)) out.quietEnd = p.quietEnd;
   if ('x' in p) out.x = Number.isFinite(p.x) ? Math.round(p.x) : null;
   if ('y' in p) out.y = Number.isFinite(p.y) ? Math.round(p.y) : null;
+  if ('edge' in p) out.edge = p.edge === 'left' || p.edge === 'right' ? p.edge : null;
   return out;
 }
 
@@ -287,8 +290,13 @@ function applySettings(patch) {
 
   if (charWin && !charWin.isDestroyed()) {
     if (patch && patch.x === null && patch.y === null) {
+      settings.edge = null;
+      characterEdge = 'right';
+      bubbleBelow = false;
       const b = defaultBounds();
       charWin.setBounds(b);
+      charWin.webContents.send('character:edge', characterEdge);
+      charWin.webContents.send('character:placement', { bubbleBelow });
     } else if (prev.size !== settings.size) {
       const b = charWin.getBounds();
       const h = settings.size + BUBBLE_H;
@@ -493,13 +501,30 @@ function defaultBounds() {
 
 function initialBounds() {
   const def = defaultBounds();
-  if (!Number.isFinite(settings.x) || !Number.isFinite(settings.y)) return def;
+  if (!Number.isFinite(settings.x) || !Number.isFinite(settings.y)) {
+    characterEdge = 'right';
+    bubbleBelow = false;
+    return def;
+  }
+  // Newer saved positions track the robot itself, so switching edge alignment
+  // never makes the character jump sideways after a restart.
+  if (settings.edge === 'left' || settings.edge === 'right') {
+    characterEdge = settings.edge;
+    const display = screen.getDisplayNearestPoint({ x: settings.x + settings.size / 2, y: settings.y + settings.size / 2 });
+    bubbleBelow = settings.y - display.workArea.y < BUBBLE_H;
+    const x = settings.x - (characterEdge === 'right' ? WIN_W - settings.size : 0);
+    const y = settings.y - (bubbleBelow ? 0 : BUBBLE_H);
+    return { ...def, x, y };
+  }
+  // Backward compatibility with positions saved by older releases.
   const cx = settings.x + WIN_W / 2;
   const cy = settings.y + def.height / 2;
   const visible = screen.getAllDisplays().some((d) => {
     const a = d.workArea;
     return cx >= a.x && cx <= a.x + a.width && cy >= a.y && cy <= a.y + a.height;
   });
+  characterEdge = 'right';
+  bubbleBelow = false;
   return visible ? { ...def, x: settings.x, y: settings.y } : def;
 }
 
@@ -530,8 +555,11 @@ function createCharacterWindow() {
     charWin.webContents.send('settings-changed', settings);
     const b = charWin.getBounds();
     const area = screen.getDisplayMatching(b).workArea;
+    if (settings.edge !== 'left' && settings.edge !== 'right') {
+      characterEdge = b.x + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right';
+    }
     bubbleBelow = b.y - area.y < BUBBLE_H;
-    charWin.webContents.send('character:edge', b.x + b.width / 2 < area.x + area.width / 2 ? 'left' : 'right');
+    charWin.webContents.send('character:edge', characterEdge);
     charWin.webContents.send('character:placement', { bubbleBelow });
     updateCursorPolling();
     refreshState(true);
@@ -733,7 +761,10 @@ ipcMain.on('char:drag-start', (_event, cursorX, cursorY) => {
   if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
   const [x, y] = charWin.getPosition();
   // Simpan posisi badan robot, bukan batas jendela transparannya.
-  dragStart = { x, charY: y + (bubbleBelow ? 0 : BUBBLE_H), cursorX, cursorY };
+  dragStart = {
+    charLeft: x + (characterEdge === 'right' ? WIN_W - settings.size : 0),
+    charY: y + (bubbleBelow ? 0 : BUBBLE_H), cursorX, cursorY,
+  };
 });
 ipcMain.on('char:drag-move', (_e, cursorX, cursorY) => {
   if (!dragStart || !charWin || charWin.isDestroyed()) return;
@@ -742,22 +773,26 @@ ipcMain.on('char:drag-move', (_e, cursorX, cursorY) => {
 
   // Ikuti monitor yang sedang dituju kursor; jangan kunci drag ke monitor awal.
   const area = screen.getDisplayNearestPoint({ x: cursorX, y: cursorY }).workArea;
-  const charX = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + cursorX - dragStart.cursorX)));
+  const charLeft = Math.max(area.x, Math.min(area.x + area.width - settings.size, Math.round(dragStart.charLeft + cursorX - dragStart.cursorX)));
   const charTop = Math.max(area.y, Math.min(area.y + area.height - settings.size, Math.round(dragStart.charY + cursorY - dragStart.cursorY)));
+  const nextEdge = charLeft + settings.size / 2 < area.x + area.width / 2 ? 'left' : 'right';
   const nextBubbleBelow = charTop - area.y < BUBBLE_H;
+  characterEdge = nextEdge;
   bubbleBelow = nextBubbleBelow;
+  const windowX = charLeft - (nextEdge === 'right' ? WIN_W - settings.size : 0);
   const windowY = nextBubbleBelow ? charTop : charTop - BUBBLE_H;
 
-  charWin.setPosition(charX, windowY, false);
-  charWin.webContents.send('character:edge', charX + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right');
+  charWin.setPosition(windowX, windowY, false);
+  charWin.webContents.send('character:edge', nextEdge);
   charWin.webContents.send('character:placement', { bubbleBelow: nextBubbleBelow });
 });
 ipcMain.on('char:drag-end', () => {
   if (!charWin || charWin.isDestroyed() || !dragStart) return;
   const [x, y] = charWin.getPosition();
   dragStart = null;
-  settings.x = x;
-  settings.y = y;
+  settings.x = x + (characterEdge === 'right' ? WIN_W - settings.size : 0);
+  settings.y = y + (bubbleBelow ? 0 : BUBBLE_H);
+  settings.edge = characterEdge;
   saveSettings();
 });
 ipcMain.on('char:click', toggleDashboard);
