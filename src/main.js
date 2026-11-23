@@ -558,7 +558,6 @@ function createCharacterWindow() {
     if (settings.edge !== 'left' && settings.edge !== 'right') {
       characterEdge = b.x + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right';
     }
-    bubbleBelow = b.y - area.y < BUBBLE_H;
     charWin.webContents.send('character:edge', characterEdge);
     charWin.webContents.send('character:placement', { bubbleBelow });
     updateCursorPolling();
