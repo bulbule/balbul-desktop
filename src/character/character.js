@@ -354,7 +354,11 @@ document.addEventListener('mousemove', (e) => {
   const el = document.elementFromPoint(e.clientX, e.clientY);
   setInteractive(!!drag || shareMode !== 'idle' || (!!el && (el.id === 'char' || !!el.closest('#bubble'))));
 });
-document.addEventListener('mouseleave', () => { setInteractive(false); document.body.classList.remove('lifted'); });
+document.addEventListener('mouseleave', () => {
+  if (drag || shareMode !== 'idle') return;
+  setInteractive(false);
+  document.body.classList.remove('lifted');
+});
 
 // File drop target: only accept a file when the pointer is over the robot.
 let fileDragOver = false;
@@ -420,6 +424,8 @@ api.on('character:edge', (edge) => {
 api.on('character:placement', (placement) => {
   document.body.classList.toggle('bubble-below', !!placement?.bubbleBelow);
 });
+img.addEventListener('pointerenter', () => setInteractive(true));
+img.addEventListener('mouseenter', () => setInteractive(true));
 img.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   e.preventDefault();
