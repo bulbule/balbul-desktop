@@ -22,8 +22,8 @@ if (!app.requestSingleInstanceLock()) {
 const ROOT = path.join(__dirname, '..');
 const colorLib = require('./color');
 const sprite = (name) => path.join(ROOT, 'assets', 'sprites', `${name}.png`);
-const WIN_W = 340; // lebar jendela karakter
-const BUBBLE_H = 400; // ruang untuk balon chat dan QR Share di atas karakter
+const WIN_W = 420; // ruang horizontal agar bubble tetap utuh di tepi layar
+const BUBBLE_H = 440; // ruang dinamis untuk bubble chat dan QR Share
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const REPEATS = ['none', 'daily', 'weekdays', 'weekly'];
 
@@ -54,6 +54,7 @@ let lastKey = '';
 let lastEncourage = Date.now();
 let pendingError = null;
 let dragStart = null;
+let bubbleBelow = false;
 let shareQuitPending = false;
 const shareService = new ShareService({
   app,
@@ -291,7 +292,8 @@ function applySettings(patch) {
     } else if (prev.size !== settings.size) {
       const b = charWin.getBounds();
       const h = settings.size + BUBBLE_H;
-      charWin.setBounds({ x: b.x, y: b.y + b.height - h, width: WIN_W, height: h });
+      const charTop = bubbleBelow ? b.y : b.y + BUBBLE_H;
+      charWin.setBounds({ x: b.x, y: bubbleBelow ? charTop : charTop - BUBBLE_H, width: WIN_W, height: h });
     }
     if (settings.showCharacter && !charWin.isVisible()) charWin.showInactive();
     if (!settings.showCharacter && charWin.isVisible()) charWin.hide();
@@ -528,7 +530,9 @@ function createCharacterWindow() {
     charWin.webContents.send('settings-changed', settings);
     const b = charWin.getBounds();
     const area = screen.getDisplayMatching(b).workArea;
+    bubbleBelow = b.y - area.y < BUBBLE_H;
     charWin.webContents.send('character:edge', b.x + b.width / 2 < area.x + area.width / 2 ? 'left' : 'right');
+    charWin.webContents.send('character:placement', { bubbleBelow });
     updateCursorPolling();
     refreshState(true);
     setTimeout(() => {
@@ -725,18 +729,28 @@ ipcMain.on('char:ignore', (_e, ignore) => {
 });
 ipcMain.on('char:drag-start', (_event, cursorX, cursorY) => {
   if (!charWin || charWin.isDestroyed()) return;
+  cursorX = Number(cursorX); cursorY = Number(cursorY);
+  if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
   const [x, y] = charWin.getPosition();
-  dragStart = { x, y, cursorX: Number(cursorX), cursorY: Number(cursorY) };
+  // Simpan posisi badan robot, bukan batas jendela transparannya.
+  dragStart = { x, charY: y + (bubbleBelow ? 0 : BUBBLE_H), cursorX, cursorY };
 });
 ipcMain.on('char:drag-move', (_e, cursorX, cursorY) => {
   if (!dragStart || !charWin || charWin.isDestroyed()) return;
   cursorX = Number(cursorX); cursorY = Number(cursorY);
   if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
-  const area = screen.getDisplayMatching(charWin.getBounds()).workArea;
-  const x = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + cursorX - dragStart.cursorX)));
-  const y = Math.max(area.y, Math.min(area.y + area.height - settings.size - BUBBLE_H, Math.round(dragStart.y + cursorY - dragStart.cursorY)));
-  charWin.setPosition(x, y, false);
-  charWin.webContents.send('character:edge', x + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right');
+
+  // Ikuti monitor yang sedang dituju kursor; jangan kunci drag ke monitor awal.
+  const area = screen.getDisplayNearestPoint({ x: cursorX, y: cursorY }).workArea;
+  const charX = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + cursorX - dragStart.cursorX)));
+  const charTop = Math.max(area.y, Math.min(area.y + area.height - settings.size, Math.round(dragStart.charY + cursorY - dragStart.cursorY)));
+  const nextBubbleBelow = charTop - area.y < BUBBLE_H;
+  bubbleBelow = nextBubbleBelow;
+  const windowY = nextBubbleBelow ? charTop : charTop - BUBBLE_H;
+
+  charWin.setPosition(charX, windowY, false);
+  charWin.webContents.send('character:edge', charX + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right');
+  charWin.webContents.send('character:placement', { bubbleBelow: nextBubbleBelow });
 });
 ipcMain.on('char:drag-end', () => {
   if (!charWin || charWin.isDestroyed() || !dragStart) return;
