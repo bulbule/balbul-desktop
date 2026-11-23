@@ -280,6 +280,7 @@ function sanitizeSettings(p) {
   if ('x' in p) out.x = Number.isFinite(p.x) ? Math.round(p.x) : null;
   if ('y' in p) out.y = Number.isFinite(p.y) ? Math.round(p.y) : null;
   if ('edge' in p) out.edge = p.edge === 'left' || p.edge === 'right' ? p.edge : null;
+  if (p.x === null && p.y === null) out.edge = null;
   return out;
 }
 
@@ -290,7 +291,6 @@ function applySettings(patch) {
 
   if (charWin && !charWin.isDestroyed()) {
     if (patch && patch.x === null && patch.y === null) {
-      settings.edge = null;
       characterEdge = 'right';
       bubbleBelow = false;
       const b = defaultBounds();
