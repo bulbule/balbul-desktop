@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.14 — 23 November 2026
+
+- Gerakkan karakter dengan posisi kursor OS langsung agar drag tetap responsif dan tidak tertahan batas monitor awal; klik karakter dan file drop tetap tersedia.
+- Tampilkan sapaan “Halo, saya BalBul, asisten reminder kecilmu.” hanya pada peluncuran pertama.
+
 ## v1.0.13 — 23 November 2026
 
 - Tambahkan tanda pesan desktop sedang dikirim, terkirim, dan dibaca. Status dibaca mengikuti `last_read_at` anggota chat yang sudah dipakai web.

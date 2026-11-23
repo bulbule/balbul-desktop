@@ -345,7 +345,10 @@ replyForm.addEventListener('submit', (event) => {
 
 // ---------- klik tembus: hanya karakter & bubble yang bisa diklik ----------
 let interactive = false;
+let drag = null;
 function setInteractive(value) {
+  // Keep the native window hit-testable until pointer capture reports release.
+  if (drag?.moved) value = true;
   if (value === interactive) return;
   interactive = value;
   api.ignoreMouse(!value);
@@ -414,9 +417,6 @@ shareFriend.addEventListener('click', () => { if (latestShare) api.shareToFriend
 shareDownload.addEventListener('click', () => { if (shareUrl) api.openShareDownload(shareUrl); });
 
 // ---------- geser & klik karakter ----------
-let drag = null;
-let dragFrame = 0;
-let pendingDragPoint = null;
 api.on('character:edge', (edge) => {
   document.body.classList.toggle('edge-left', edge === 'left');
   document.body.classList.toggle('edge-right', edge === 'right');
@@ -444,20 +444,11 @@ img.addEventListener('pointermove', (e) => {
     drag.moved = true;
     api.dragStart(drag.sx, drag.sy);
   }
-  pendingDragPoint = { x: e.screenX, y: e.screenY };
-  if (!dragFrame) dragFrame = requestAnimationFrame(() => {
-    dragFrame = 0;
-    if (pendingDragPoint && drag?.moved) api.dragMove(pendingDragPoint.x, pendingDragPoint.y);
-  });
   document.body.classList.toggle('facing-left', dx < -2);
 });
 function finishCharacterDrag() {
   if (!drag) return;
   const { moved } = drag;
-  if (dragFrame) cancelAnimationFrame(dragFrame);
-  dragFrame = 0;
-  if (moved && pendingDragPoint) api.dragMove(pendingDragPoint.x, pendingDragPoint.y);
-  pendingDragPoint = null;
   drag = null;
   document.body.classList.remove('lifted');
   setState(currentState);

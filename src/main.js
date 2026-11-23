@@ -55,6 +55,7 @@ let lastKey = '';
 let lastEncourage = Date.now();
 let pendingError = null;
 let dragStart = null;
+let dragTimer = null;
 let bubbleBelow = false;
 let characterEdge = 'right';
 let shareQuitPending = false;
@@ -82,6 +83,7 @@ const shareService = new ShareService({
 // ---------------------------------------------------------------- penyimpanan (file JSON)
 const tasksPath = () => path.join(app.getPath('userData'), 'tasks.json');
 const settingsPath = () => path.join(app.getPath('userData'), 'settings.json');
+const firstLaunchPath = () => path.join(app.getPath('userData'), 'first-launch.json');
 const authSessionPath = () => path.join(app.getPath('userData'), 'auth-session.enc');
 
 function readJson(file, fallback, label) {
@@ -529,7 +531,7 @@ function initialBounds() {
   return visible ? { ...def, x: settings.x, y: settings.y } : def;
 }
 
-function createCharacterWindow() {
+function createCharacterWindow({ firstRun = false } = {}) {
   const b = initialBounds();
   charWin = new BrowserWindow({
     ...b,
@@ -563,13 +565,16 @@ function createCharacterWindow() {
     charWin.webContents.send('character:placement', { bubbleBelow });
     updateCursorPolling();
     refreshState(true);
-    setTimeout(() => {
-      const n = pendingTasks().length;
-      setOverride('happy', n ? `Halo! Ada ${n} tugas yang belum selesai.` : 'Halo! Belum ada tugas, santai dulu.', 6000);
+    if (firstRun) setTimeout(() => {
+      setOverride('happy', 'Halo, saya BalBul, asisten reminder kecilmu.', 6000);
     }, 1500);
   });
   charWin.webContents.on('render-process-gone', () => { if (shareService.active) shareService.stop('renderer-gone'); });
-  charWin.on('closed', () => { charWin = null; if (shareService.active) shareService.stop('character-closed'); });
+  charWin.on('closed', () => {
+    if (dragTimer) clearInterval(dragTimer);
+    dragTimer = null; dragStart = null; charWin = null;
+    if (shareService.active) shareService.stop('character-closed');
+  });
 }
 
 function showDashboard({ silent = false } = {}) {
@@ -760,34 +765,37 @@ ipcMain.on('char:drag-start', (_event, cursorX, cursorY) => {
   cursorX = Number(cursorX); cursorY = Number(cursorY);
   if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
   const [x, y] = charWin.getPosition();
-  // Simpan posisi badan robot, bukan batas jendela transparannya.
+  if (dragTimer) clearInterval(dragTimer);
+  // Anchor on the visible character, not the larger transparent chat window.
   dragStart = {
-    charLeft: x + (characterEdge === 'right' ? WIN_W - settings.size : 0),
-    charY: y + (bubbleBelow ? 0 : BUBBLE_H), cursorX, cursorY,
+    offsetX: cursorX - (x + (characterEdge === 'right' ? WIN_W - settings.size : 0)),
+    offsetY: cursorY - (y + (bubbleBelow ? 0 : BUBBLE_H)),
   };
-});
-ipcMain.on('char:drag-move', (_e, cursorX, cursorY) => {
-  if (!dragStart || !charWin || charWin.isDestroyed()) return;
-  cursorX = Number(cursorX); cursorY = Number(cursorY);
-  if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
-
-  // Ikuti monitor yang sedang dituju kursor; jangan kunci drag ke monitor awal.
-  const area = screen.getDisplayNearestPoint({ x: cursorX, y: cursorY }).workArea;
-  const charLeft = Math.max(area.x, Math.min(area.x + area.width - settings.size, Math.round(dragStart.charLeft + cursorX - dragStart.cursorX)));
-  const charTop = Math.max(area.y, Math.min(area.y + area.height - settings.size, Math.round(dragStart.charY + cursorY - dragStart.cursorY)));
-  const nextEdge = charLeft + settings.size / 2 < area.x + area.width / 2 ? 'left' : 'right';
-  const nextBubbleBelow = charTop - area.y < BUBBLE_H;
-  characterEdge = nextEdge;
-  bubbleBelow = nextBubbleBelow;
-  const windowX = charLeft - (nextEdge === 'right' ? WIN_W - settings.size : 0);
-  const windowY = nextBubbleBelow ? charTop : charTop - BUBBLE_H;
-
-  charWin.setPosition(windowX, windowY, false);
-  charWin.webContents.send('character:edge', nextEdge);
-  charWin.webContents.send('character:placement', { bubbleBelow: nextBubbleBelow });
+  // Sample the native cursor at display cadence to keep renderer IPC out of the
+  // movement loop while preserving edge alignment and the bubble's safe placement.
+  dragTimer = setInterval(() => {
+    if (!dragStart || !charWin || charWin.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    const area = screen.getDisplayNearestPoint(cursor).workArea;
+    const charLeft = Math.max(area.x, Math.min(area.x + area.width - settings.size, Math.round(cursor.x - dragStart.offsetX)));
+    const charTop = Math.max(area.y, Math.min(area.y + area.height - settings.size, Math.round(cursor.y - dragStart.offsetY)));
+    const nextEdge = charLeft + settings.size / 2 < area.x + area.width / 2 ? 'left' : 'right';
+    const nextBubbleBelow = charTop - area.y < BUBBLE_H;
+    const edgeChanged = nextEdge !== characterEdge;
+    const placementChanged = nextBubbleBelow !== bubbleBelow;
+    characterEdge = nextEdge;
+    bubbleBelow = nextBubbleBelow;
+    const windowX = charLeft - (nextEdge === 'right' ? WIN_W - settings.size : 0);
+    const windowY = nextBubbleBelow ? charTop : charTop - BUBBLE_H;
+    charWin.setPosition(windowX, windowY, false);
+    if (edgeChanged) charWin.webContents.send('character:edge', nextEdge);
+    if (placementChanged) charWin.webContents.send('character:placement', { bubbleBelow: nextBubbleBelow });
+  }, 16);
 });
 ipcMain.on('char:drag-end', () => {
   if (!charWin || charWin.isDestroyed() || !dragStart) return;
+  if (dragTimer) clearInterval(dragTimer);
+  dragTimer = null;
   const [x, y] = charWin.getPosition();
   dragStart = null;
   settings.x = x + (characterEdge === 'right' ? WIN_W - settings.size : 0);
@@ -842,11 +850,16 @@ ipcMain.on('app:notify-chat', (_e, payload) => {
 app.whenReady().then(() => {
   settings = { ...DEFAULT_SETTINGS, ...sanitizeSettings(readJson(settingsPath(), {}, 'pengaturan')) };
   const firstRun = !fs.existsSync(tasksPath());
+  const firstInstall = !fs.existsSync(firstLaunchPath()) && firstRun && !fs.existsSync(settingsPath());
+  if (!fs.existsSync(firstLaunchPath())) {
+    fs.mkdirSync(path.dirname(firstLaunchPath()), { recursive: true });
+    fs.writeFileSync(firstLaunchPath(), JSON.stringify({ completed: true }));
+  }
   const loaded = readJson(tasksPath(), [], 'tugas');
   tasks = Array.isArray(loaded) ? loaded : [];
 
   createTray();
-  createCharacterWindow();
+  createCharacterWindow({ firstRun: firstInstall });
   showDashboard({ silent: true });
   if (app.isPackaged) {
     autoUpdater.autoDownload = true;
