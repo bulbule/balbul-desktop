@@ -21,6 +21,8 @@ html, body {
 }
 body.edge-left #stage { align-items: flex-start; }
 body.edge-right #stage { align-items: flex-end; }
+/* Saat robot mendekati sisi atas monitor, bubble pindah ke bawah robot. */
+body.bubble-below #stage { top: 0; bottom: auto; flex-direction: column-reverse; }
 
 /* pembungkus: dipakai untuk badan yang condong ke arah kursor */
 #char-wrap {
@@ -45,6 +47,7 @@ body.edge-right #stage { align-items: flex-end; }
   image-rendering: pixelated;
   transform-origin: 50% 100%;
   cursor: grab;
+  touch-action: none;
   -webkit-user-drag: none;
 }
 
@@ -67,8 +70,10 @@ body.edge-right #stage { align-items: flex-end; }
 #bubble {
   position: relative;
   width: min(290px, calc(100vw - 38px));
-  max-height: 112px;
+  max-height: 220px;
   overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
   box-sizing: border-box;
   margin-bottom: 10px;
   padding: 10px 14px;
@@ -104,6 +109,8 @@ body.edge-right #bubble { margin-left: auto; margin-right: 0; }
 }
 body.edge-left #bubble::after { left: 72px; }
 body.edge-right #bubble::after { left: auto; right: 65px; }
+body.bubble-below #bubble { margin-top: 10px; margin-bottom: 0; }
+body.bubble-below #bubble::after { top: -9px; bottom: auto; transform: translateX(-50%) rotate(225deg); }
 #bubble.hidden, #bubble-actions.hidden { display: none; }
 #bubble:not(.hidden) { animation: bubble-pop .22s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes bubble-pop { from { opacity:0; transform:translateY(8px) scale(.96); } to { opacity:1; transform:translateY(0) scale(1); } }
