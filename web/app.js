@@ -118,6 +118,7 @@ async function enterApp(currentUser) {
   if(globalMessageChannel)await supabase.removeChannel(globalMessageChannel);
   globalMessageChannel=supabase.channel('balbul-incoming-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveIncomingMessage(payload.new)).subscribe();
   updateChatNavDot();updateSoundButton();
+  maybeStartTour();
 }
 function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel);if(globalMessageChannel){supabase.removeChannel(globalMessageChannel);globalMessageChannel=null;} }
 // ---- Pemulihan password: tampilkan form password baru setelah klik tautan email ----
@@ -409,6 +410,37 @@ $('#pushToggle')?.addEventListener('click',async()=>{
   }catch(e){hint.textContent='Gagal: '+(e.message||e);}
   await refreshPushUi();
 });
+
+// ---- Tur awal untuk user baru ----
+const TOUR_STEPS=[
+  {panel:'tasks',nav:'tasks',title:'Selamat datang di balBul! 👋',text:'Ini tur singkat (30 detik). balBul membantu kamu mengingat tugas dan ngobrol dengan teman, di HP, Windows, dan Mac.'},
+  {panel:'tasks',nav:'tasks',title:'Reminder',text:'Tambahkan tugas dan atur waktunya di sini. Saat jatuh tempo, balBul mengingatkanmu lewat notifikasi.'},
+  {panel:'friends',nav:'friends',title:'Teman',text:'Bagikan kode temanmu (BUL-XXXXXX) yang ada di Profil, atau masukkan kode temanmu di sini untuk saling terhubung.'},
+  {panel:'chats',nav:'chats',title:'Pesan',text:'Ngobrol langsung dengan teman. Pesan baru muncul seketika, dan notifikasi masuk walau app ditutup.'},
+  {panel:'profile',nav:'profile',title:'Profil & notifikasi',text:'Ganti nama dan aktifkan notifikasi di sini. ',ios:true},
+];
+let tourIdx=0;
+function tourKey(){return 'balbul-tour-'+(user?.id||'x');}
+function tourEl(){return $('#tour');}
+function tourClear(){document.querySelectorAll('.tour-hl').forEach(e=>e.classList.remove('tour-hl'));}
+function tourRender(){
+  const st=TOUR_STEPS[tourIdx],el=tourEl();if(!el)return;
+  if(st.panel)hubPanel(st.panel);
+  tourClear();const nav=document.querySelector('.nav[data-panel="'+st.nav+'"]');if(nav&&tourIdx>0)nav.classList.add('tour-hl');
+  let text=st.text;
+  if(st.ios&&isIOS()&&!isStandalone())text+='Di iPhone: tekan Share → Add to Home Screen, lalu buka balBul dari ikon di Home Screen supaya notifikasi bisa aktif.';
+  else if(st.ios)text+='Tekan "Aktifkan notifikasi" lalu pilih Izinkan.';
+  $('#tourTitle').textContent=st.title;$('#tourText').textContent=text;
+  $('#tourDots').textContent=TOUR_STEPS.map((_,i)=>i===tourIdx?'●':'○').join(' ');
+  $('#tourNext').textContent=tourIdx===TOUR_STEPS.length-1?'Selesai':'Lanjut';
+  el.classList.remove('hidden');
+}
+function endTour(){tourClear();tourEl()?.classList.add('hidden');try{localStorage.setItem(tourKey(),'1');}catch(_){};hubPanel('tasks');}
+function startTour(){tourIdx=0;tourRender();}
+$('#tourNext')?.addEventListener('click',()=>{if(tourIdx>=TOUR_STEPS.length-1)endTour();else{tourIdx++;tourRender();}});
+$('#tourSkip')?.addEventListener('click',endTour);
+$('#tourAgain')?.addEventListener('click',startTour);
+function maybeStartTour(){try{if(localStorage.getItem(tourKey()))return;}catch(_){return;}setTimeout(startTour,600);}
 
 // Install lightweight PWA service worker for Home Screen and incoming push events.
 if ('serviceWorker' in navigator) {

@@ -327,3 +327,18 @@
 @media(max-width:650px){.download-section{display:flex;flex-direction:column;align-items:stretch;min-height:0;padding:10px 0 16px;margin:8px 12px 28px;border-radius:22px;text-align:center;background:linear-gradient(160deg,#082551,#103260 58%,#154375)}.download-section .sleepy-scene{display:block;position:relative;width:min(88%,330px);height:auto;max-height:190px;object-fit:contain;object-position:center;margin:0 auto 2px;-webkit-mask-image:radial-gradient(ellipse 62% 62% at 50% 50%,#000 62%,transparent 100%);mask-image:radial-gradient(ellipse 62% 62% at 50% 50%,#000 62%,transparent 100%)}.download-copy{width:100%;padding:0 16px 16px;text-align:center}.download-copy h2{font-size:22px}.download-copy p{font-size:12px;margin:0 auto 14px}.download-platforms{grid-template-columns:1fr;gap:9px}.download-copy .platform-button{height:54px;width:100%;padding:0 18px;border-radius:28px}.platform-button b{font-size:15px}.platform-button small{font-size:10px}.platform-button .platform-icon{width:23px;height:23px}.platform-button .download-icon{width:17px;height:17px}.download-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:auto;margin:0 16px;padding:14px 0 0;border:0;border-top:1px solid #b7d7f455;text-align:left}.meta-platform{gap:7px}.meta-platform svg{width:21px;height:21px}.meta-platform b{font-size:10px}.meta-platform small{font-size:8px}}
 
 .mac-note{font-size:12px;opacity:.75;margin:10px 0 0}.mac-note a{color:inherit;text-decoration:underline}
+
+.install-section{padding:70px 20px;background:#071a33;color:#e8f4ff}
+.install-inner{max-width:860px;margin:0 auto}
+.install-inner .eyebrow{letter-spacing:.2em;font-size:12px;color:#35e0ff;margin:0 0 8px}
+.install-inner h2{font-size:clamp(28px,5vw,40px);margin:0 0 10px}.install-inner h2 span{color:#35e0ff}
+.install-lead{opacity:.8;margin:0 0 22px;line-height:1.6}
+.install-tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.install-tabs button{border:1px solid #1f4a78;background:#0b2447;color:#cfe8ff;padding:10px 20px;border-radius:999px;font:inherit;font-weight:700;cursor:pointer}
+.install-tabs button.active{background:#35e0ff;color:#04223a;border-color:#35e0ff}
+.install-panel{display:none;background:#0b2447;border:1px solid #1f4a78;border-radius:20px;padding:22px 24px}
+.install-panel.active{display:block}
+.install-panel ol{margin:0;padding-left:22px;display:grid;gap:12px;line-height:1.6}
+.install-panel code{background:#06172e;padding:2px 7px;border-radius:6px;font-size:.92em;word-break:break-all}
+.install-note{margin:16px 0 0;font-size:14px;opacity:.8;line-height:1.6}
+@media(max-width:650px){.install-section{padding:48px 16px}.install-panel{padding:18px 16px}}
