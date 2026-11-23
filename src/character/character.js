@@ -352,7 +352,7 @@ function setInteractive(value) {
 }
 document.addEventListener('mousemove', (e) => {
   const el = document.elementFromPoint(e.clientX, e.clientY);
-  setInteractive(shareMode !== 'idle' || (!!el && (el.id === 'char' || !!el.closest('#bubble'))));
+  setInteractive(!!drag || shareMode !== 'idle' || (!!el && (el.id === 'char' || !!el.closest('#bubble'))));
 });
 document.addEventListener('mouseleave', () => { setInteractive(false); document.body.classList.remove('lifted'); });
 
@@ -417,8 +417,13 @@ api.on('character:edge', (edge) => {
   document.body.classList.toggle('edge-left', edge === 'left');
   document.body.classList.toggle('edge-right', edge === 'right');
 });
+api.on('character:placement', (placement) => {
+  document.body.classList.toggle('bubble-below', !!placement?.bubbleBelow);
+});
 img.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
+  e.preventDefault();
+  setInteractive(true); // jangan menunggu mousemove pertama untuk mengaktifkan klik
   img.setPointerCapture(e.pointerId);
   drag = { sx: e.screenX, sy: e.screenY, moved: false };
   document.body.classList.add('lifted');
@@ -440,7 +445,7 @@ img.addEventListener('pointermove', (e) => {
   });
   document.body.classList.toggle('facing-left', dx < -2);
 });
-img.addEventListener('pointerup', () => {
+function finishCharacterDrag() {
   if (!drag) return;
   const { moved } = drag;
   if (dragFrame) cancelAnimationFrame(dragFrame);
@@ -452,7 +457,10 @@ img.addEventListener('pointerup', () => {
   setState(currentState);
   if (moved) api.dragEnd();
   else api.clickCharacter();
-});
+  setInteractive(false);
+}
+img.addEventListener('pointerup', finishCharacterDrag);
+img.addEventListener('pointercancel', finishCharacterDrag);
 img.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   api.characterMenu();
