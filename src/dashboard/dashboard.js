@@ -17,7 +17,7 @@ let settings = {};
 let view = 'today';
 let editingId = null;
 let cloud = null, cloudUser = null, cloudProfile = null;
-let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null;
+let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null, conversationMembers = [];
 let pendingShareLink = null;
 let receiveShare = null, receivedFiles = [];
 let sharedTasks = [], taskMembersById = {};
@@ -43,7 +43,7 @@ function receiveDesktopIncoming(message){
   const shareCard=ShareCard.parse(message.body);
   const dashboardVisible=document.visibilityState==='visible'&&document.hasFocus();
   // Pesan tetap dimasukkan ke chat yang sedang terbuka, walau dashboard sedang tersembunyi.
-  if(sameChat){appendCloudMessage(message);if(dashboardVisible&&!shareCard)return;}
+  if(sameChat){appendCloudMessage(message);if(dashboardVisible){markDesktopConversationRead(message.conversation_id);if(!shareCard)return;}}
   playIncomingSound();
   if(!(sameChat&&dashboardVisible))updateChatUnread(message.conversation_id,true);
   const peer=conversations.find(c=>c.id===message.conversation_id)?.other?.[0];
@@ -576,12 +576,12 @@ async function loadCloudConversations(){
   if(error)throw error;const ids=[...new Set((memberships||[]).map(x=>x.conversation_id))];
   if(!ids.length){conversations=[];activeConversation=null;if(view==='chat')renderChatView();return;}
   const {data:rows,error:e}=await cloud.from('conversations').select('*').in('id',ids).order('created_at',{ascending:false});if(e)throw e;
-  const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);if(m)throw m;
+  const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id,last_read_at').in('conversation_id',ids);if(m)throw m;
   const keyOther=c=>c.kind==='direct'&&c.direct_key?c.direct_key.split(':').find(x=>x!==cloudUser.id):null;
   const otherIds=[...new Set([...(members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id),...(rows||[]).map(keyOther).filter(Boolean)])];
   const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name,color').in('id',otherIds):{data:[],error:null};if(p)throw p;
   const byId=Object.fromEntries((people||[]).map(x=>[x.id,x]));
-  const mapped=(rows||[]).map(conv=>{let other=(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean);if(!other.length&&keyOther(conv)&&byId[keyOther(conv)])other=[byId[keyOther(conv)]];return {...conv,other};});
+  const mapped=(rows||[]).map(conv=>{const peers=(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id);let other=peers.map(x=>byId[x.user_id]).filter(Boolean);if(!other.length&&keyOther(conv)&&byId[keyOther(conv)])other=[byId[keyOther(conv)]];return {...conv,other,peerReadAt:peers.length&&peers.every(x=>x.last_read_at)?peers.map(x=>x.last_read_at).sort()[0]:null};});
   const seen=new Set();conversations=mapped.filter(conv=>{if(conv.kind!=='direct')return true;const otherId=conv.other[0]?.id;if(!otherId)return true;if(seen.has(otherId))return false;seen.add(otherId);return true;});
   if(activeConversation&&!conversations.some(x=>x.id===activeConversation.id))activeConversation=null;
   if(view==='chat')renderChatView();
@@ -632,13 +632,19 @@ async function leaveDesktopConversation(){
 function openCloudConversation(conv){activeConversation=conv;updateChatUnread(conv.id,false);view='chat';render();}
 async function loadCloudMessages(id){
   const box=$('#desktop-messages');if(!box)return;
-  const {data,error}=await cloud.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150);
-  if(error){cloudNotice(error.message,true);return;}if(!$('#desktop-messages')||activeConversation?.id!==id)return;
-  box.replaceChildren(...(data||[]).map(messageElement));box.scrollTop=box.scrollHeight;
+  const [{data,error},{data:members,error:memberError}]=await Promise.all([
+    cloud.from('messages').select('*').eq('conversation_id',id).order('created_at',{ascending:true}).limit(150),
+    cloud.from('conversation_members').select('conversation_id,user_id,last_read_at').eq('conversation_id',id)
+  ]);
+  if(error||memberError){cloudNotice((error||memberError).message,true);return;}if(!$('#desktop-messages')||activeConversation?.id!==id)return;
+  conversationMembers=members||[];
+  const peers=conversationMembers.filter(m=>m.user_id!==cloudUser.id);
+  activeConversation.peerReadAt=peers.length&&peers.every(m=>m.last_read_at)?peers.map(m=>m.last_read_at).sort()[0]:null;
+  box.replaceChildren(...(data||[]).map(messageElement));box.scrollTop=box.scrollHeight;renderDesktopReadStatuses();markDesktopConversationRead(id);
 }
 function messageElement(message){
   const el=h('div',{class:'desktop-message'+(message.sender_id===cloudUser.id?' mine':'')});
-  el.dataset.messageId=message.id;el.dataset.rawBody=message.body;
+  el.dataset.messageId=message.id;el.dataset.rawBody=message.body;el.dataset.createdAt=message.created_at;
   const card=ShareCard.parse(message.body);
   el.append(card?shareCardElement(card):chatBodyElement(message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
   if(message.sender_id===cloudUser.id)setMessageSendState(el,'sent');
@@ -649,23 +655,38 @@ function setMessageSendState(el,state){
   el.dataset.sendState=state;
   let label=el.querySelector('.message-send-state');
   if(!label){label=h('small',{class:'message-send-state'});el.append(label);}
-  label.textContent=state==='sending'?'Mengirim…':state==='sent'?'Terkirim':state==='failed'?'Gagal terkirim · klik untuk coba lagi':'';
+  label.textContent=state==='sending'?'◷ Mengirim…':state==='sent'?'✓ Terkirim':state==='read'?'✓✓ Dibaca':state==='failed'?'Gagal terkirim · klik untuk coba lagi':'';
   label.className='message-send-state '+state;
+}
+function renderDesktopReadStatuses(){
+  if(!activeConversation)return;
+  const readAt=Date.parse(activeConversation.peerReadAt||'');
+  document.querySelectorAll('#desktop-messages .desktop-message.mine[data-send-state="sent"],#desktop-messages .desktop-message.mine[data-send-state="read"]').forEach(el=>{
+    const created=Date.parse(el.dataset.createdAt||'');
+    setMessageSendState(el,readAt&&created&&readAt>=created?'read':'sent');
+  });
+}
+async function markDesktopConversationRead(conversationId){
+  if(!cloudUser||!cloud||!conversationId||document.visibilityState==='hidden'||!document.hasFocus()||view!=='chat'||activeConversation?.id!==conversationId)return;
+  const now=new Date().toISOString();
+  const {error}=await cloud.from('conversation_members').update({last_read_at:now}).eq('conversation_id',conversationId).eq('user_id',cloudUser.id);
+  if(error){console.warn('Gagal memperbarui status baca desktop:',error.message);return;}
+  const me=conversationMembers.find(m=>m.user_id===cloudUser.id);if(me)me.last_read_at=now;
 }
 async function retryDesktopMessage(el,conversationId,body){
   if(!el||el.dataset.sendState==='sending')return;
   setMessageSendState(el,'sending');
   const {data,error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}).select().single();
   if(error){setMessageSendState(el,'failed');cloudNotice('Pesan belum terkirim. Klik label Gagal untuk mencoba lagi.',true);return;}
-  el.dataset.messageId=data.id;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-  setMessageSendState(el,'sent');
+  el.dataset.messageId=data.id;el.dataset.createdAt=data.created_at;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  setMessageSendState(el,'sent');renderDesktopReadStatuses();
 }
 function appendCloudMessage(message){
   if(!activeConversation||message.conversation_id!==activeConversation.id)return;
   const box=$('#desktop-messages');if(!box||box.querySelector('[data-message-id="'+message.id+'"]'))return;
   if(message.sender_id===cloudUser?.id){
     const pending=[...box.querySelectorAll('[data-send-state="sending"]')].find(el=>el.dataset.rawBody===message.body);
-    if(pending){pending.dataset.messageId=message.id;const time=pending.querySelector('time');if(time)time.textContent=new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageSendState(pending,'sent');return;}
+    if(pending){pending.dataset.messageId=message.id;pending.dataset.createdAt=message.created_at;const time=pending.querySelector('time');if(time)time.textContent=new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageSendState(pending,'sent');renderDesktopReadStatuses();return;}
   }
   box.append(messageElement(message));box.scrollTop=box.scrollHeight;
 }
@@ -673,15 +694,15 @@ async function sendDesktopMessage(e){
   e.preventDefault();const input=$('#desktop-message-input');const body=input?.value.trim();if(!body||!activeConversation||!cloudUser)return;
   const conversationId=activeConversation.id;
   const box=$('#desktop-messages');const tempId='pending-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-  const el=h('div',{class:'desktop-message mine', 'data-message-id':tempId});el.dataset.rawBody=body;el.append(chatBodyElement(body),h('time',{},new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  const el=h('div',{class:'desktop-message mine', 'data-message-id':tempId});el.dataset.rawBody=body;el.dataset.createdAt=new Date().toISOString();el.append(chatBodyElement(body),h('time',{},new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
   box?.append(el);if(box)box.scrollTop=box.scrollHeight;
   input.value='';input.focus();setMessageSendState(el,'sending');
   const submit=e.submitter; if(submit)submit.disabled=true;
   try{
     const {data,error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}).select().single();
     if(error)throw error;
-    el.dataset.messageId=data.id;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-    setMessageSendState(el,'sent');
+    el.dataset.messageId=data.id;el.dataset.createdAt=data.created_at;el.querySelector('time').textContent=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    setMessageSendState(el,'sent');renderDesktopReadStatuses();
   }catch(error){
     setMessageSendState(el,'failed');
     el.querySelector('.message-send-state').title=error.message||'Periksa koneksi lalu klik untuk mencoba lagi';
@@ -836,10 +857,18 @@ window.addEventListener('focus',()=>{if(navigator.onLine)syncCloudState();});
 function startChatRealtime(id){
   const channelName='balbul-desktop-chat-'+id;
   realtimeChannels.filter(ch=>ch.topic==='realtime:'+channelName).forEach(ch=>{cloud.removeChannel(ch);realtimeChannels=realtimeChannels.filter(x=>x!==ch);});
-  const ch=cloud.channel(channelName).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>receiveDesktopIncoming(payload.new)).subscribe();
+  const ch=cloud.channel(channelName)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:'conversation_id=eq.'+id},payload=>receiveDesktopIncoming(payload.new))
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'conversation_members',filter:'conversation_id=eq.'+id},payload=>{
+      const idx=conversationMembers.findIndex(m=>m.user_id===payload.new.user_id);
+      if(idx>=0)conversationMembers[idx]=payload.new;else conversationMembers.push(payload.new);
+      if(payload.new.user_id!==cloudUser?.id)activeConversation.peerReadAt=payload.new.last_read_at||null;
+      renderDesktopReadStatuses();
+    }).subscribe();
   realtimeChannels.push(ch);
 }
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&activeConversation&&unreadChats[activeConversation.id])updateChatUnread(activeConversation.id,false);});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&activeConversation){if(unreadChats[activeConversation.id])updateChatUnread(activeConversation.id,false);markDesktopConversationRead(activeConversation.id);}});
+window.addEventListener('focus',()=>{if(activeConversation)markDesktopConversationRead(activeConversation.id);});
 api.on('chat:open-conversation',async ({conversationId})=>{
   if(!cloudUser||!conversationId)return;
   await loadCloudConversations();

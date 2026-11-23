@@ -358,4 +358,5 @@ body:not(.authenticated) #sidebar { display: none; }
 .message-send-state { display:block; margin-top:4px; font-size:10px; opacity:.8; text-align:right; }
 .message-send-state.sending { color:#fbbf24; }
 .message-send-state.sent { color:#22c55e; }
+.message-send-state.read { color:#0f766e; font-weight:800; }
 .message-send-state.failed { color:#f87171; text-decoration:underline; cursor:pointer; }

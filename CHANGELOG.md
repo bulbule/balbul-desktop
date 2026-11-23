@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.13 — 23 November 2026
+
+- Tambahkan tanda pesan desktop sedang dikirim, terkirim, dan dibaca. Status dibaca mengikuti `last_read_at` anggota chat yang sudah dipakai web.
+
 ## v1.0.12 — 23 November 2026
 
 - Sinkronkan warna BalBul dan tugas/pengingat personal antara desktop dan web memakai akun Supabase yang sama. Data tugas lokal dipisahkan per akun pada perangkat.
