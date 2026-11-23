@@ -1,14 +1,14 @@
 (function () {
 'use strict';
-// supabase-js dimuat lokal dari vendor/supabase.js (disalin saat `npm install`).
+// Paket UMD dari dependensi lokal; Electron membawanya bersama aplikasi.
 const createClient = window.supabase && window.supabase.createClient;
 if (!createClient) {
   const box = document.querySelector('#auth-message');
   if (box) {
-    box.textContent = 'Komponen akun belum terpasang. Jalankan "npm install" lalu "npm start" lagi.';
+    box.textContent = 'Komponen akun belum termuat. Tutup lalu buka ulang balBul. Jika masih muncul, pasang ulang aplikasi.';
     box.classList.add('error');
   }
-  throw new Error('supabase-js lokal tidak ditemukan (src/dashboard/vendor/supabase.js)');
+  throw new Error('supabase-js UMD tidak ditemukan di dependensi aplikasi');
 }
 
 const SUPABASE_URL = 'https://okdckmorwoihndvzmhsx.supabase.co';
@@ -53,7 +53,9 @@ function setMode(next) {
   say('');
 }
 function showSignedOut() {
+  const hadUser = !!activeUserId;
   activeUserId = null;
+  if (hadUser) window.dispatchEvent(new CustomEvent('balbul-auth-signed-out'));
   document.body.classList.remove('authenticated');
   $('#auth-screen').classList.remove('hidden');
   $('#app-shell').classList.add('hidden');
@@ -70,7 +72,7 @@ async function showSignedIn(user) {
   try {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('display_name, friend_code')
+      .select('display_name, friend_code, color, color_updated_at')
       .eq('id', user.id)
       .single();
     if (error) throw error;

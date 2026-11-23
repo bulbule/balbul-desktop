@@ -1,8 +1,8 @@
 'use strict';
 // Jembatan aman antara tampilan (HTML) dan "otak" aplikasi (main.js).
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor', 'chat:open-conversation', 'chat:quick-reply', 'character:chat-message'];
+const ALLOWED_EVENTS = ['tasks-changed', 'settings-changed', 'character:state', 'character:cursor', 'character:edge', 'chat:open-conversation', 'chat:quick-reply', 'character:chat-message', 'character:share-received', 'share:ready', 'share:error', 'share:expired', 'share:closed', 'share:copied', 'share:pick-friend', 'receive:ready', 'receive:file', 'receive:error', 'receive:expired', 'receive:closed'];
 
 contextBridge.exposeInMainWorld('balbul', {
   // penyimpanan sesi akun (terenkripsi oleh main process)
@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('balbul', {
 
   // tugas
   listTasks: () => ipcRenderer.invoke('tasks:list'),
+  replaceCloudPersonalTasks: (list) => ipcRenderer.invoke('tasks:replace-cloud-personal', list),
   addTask: (data) => ipcRenderer.invoke('tasks:add', data),
   updateTask: (id, patch) => ipcRenderer.invoke('tasks:update', id, patch),
   toggleTask: (id) => ipcRenderer.invoke('tasks:toggle', id),
@@ -29,14 +30,26 @@ contextBridge.exposeInMainWorld('balbul', {
 
   // karakter
   ignoreMouse: (ignore) => ipcRenderer.send('char:ignore', ignore),
-  dragStart: () => ipcRenderer.send('char:drag-start'),
-  dragMove: (dx, dy) => ipcRenderer.send('char:drag-move', dx, dy),
+  dragStart: (x, y) => ipcRenderer.send('char:drag-start', x, y),
+  dragMove: (x, y) => ipcRenderer.send('char:drag-move', x, y),
   dragEnd: () => ipcRenderer.send('char:drag-end'),
   clickCharacter: () => ipcRenderer.send('char:click'),
   characterMenu: () => ipcRenderer.send('char:menu'),
   openDashboard: () => ipcRenderer.send('app:open-dashboard'),
   notifyChat: (payload) => ipcRenderer.send('app:notify-chat', payload),
   sendQuickReply: (payload) => ipcRenderer.send('char:quick-reply', payload),
+  getPathForFile: (file) => {
+    try { return webUtils.getPathForFile(file); }
+    catch (_) { return typeof file?.path === 'string' ? file.path : ''; }
+  },
+  startShare: (filePath) => ipcRenderer.invoke('share:start', filePath),
+  stopShare: () => ipcRenderer.invoke('share:stop'),
+  shareToFriend: (share) => ipcRenderer.send('app:share-to-friend', share),
+  openShareDownload: (url) => ipcRenderer.send('app:open-share-download', url),
+  openExternalLink: (url) => ipcRenderer.send('app:open-external-link', url),
+  startReceive: () => ipcRenderer.invoke('receive:start'),
+  stopReceive: () => ipcRenderer.invoke('receive:stop'),
+  openReceiveFolder: () => ipcRenderer.invoke('receive:open-folder'),
 
   // event dari main.js
   on: (channel, callback) => {

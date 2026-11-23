@@ -4,7 +4,7 @@ import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const $ = (s) => document.querySelector(s);
 const landingView = $('#landingView'), authView = $('#authView'), appView = $('#appView');
-let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null;
+let mode = 'login', user = null, profile = null, activeConversation = null, messageChannel = null, messageSubscription = null, profileChannel = null;
 let conversations = [], friends = [], conversationMembers = [];
 let pendingChatId = new URLSearchParams(location.search).get('chat');
 if(pendingChatId)try{history.replaceState(null,'',location.pathname+location.hash);}catch(_){}
@@ -104,6 +104,8 @@ $('#signOut').addEventListener('click', async () => { await supabase.auth.signOu
 $('#goHome')?.addEventListener('click',()=>{appView.classList.add('hidden');landingView.classList.remove('hidden');window.scrollTo(0,0);});
 
 async function enterApp(currentUser) {
+  if(typeof taskChannel!=='undefined'&&taskChannel){await supabase.removeChannel(taskChannel);taskChannel=null;}
+  if(profileChannel){await supabase.removeChannel(profileChannel);profileChannel=null;}
   user = currentUser;
   loadUnread();
   const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -117,13 +119,19 @@ async function enterApp(currentUser) {
   $('#myAvatar').textContent = (profile.display_name || 'b').slice(0,1).toUpperCase();
   $('#myAvatar').dataset.color = profile.color || '';
   if($('#myColor'))$('#myColor').value = profile.color || '#35e0ff';
+  profileChannel=supabase.channel('balbul-profile-'+user.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+user.id},payload=>{
+    const c=window.balbulColor?.normalizeHex(payload.new?.color);if(!c)return;
+    profile={...profile,...payload.new};if($('#myColor'))$('#myColor').value=c;
+    const my=$('#myAvatar');if(my)my.dataset.color=c;const large=$('#profileAvatarLarge');if(large)large.dataset.color=c;
+    requestAnimationFrame(paintAvatars);
+  }).subscribe();
   await loadFriends(); await loadConversations();
   if(globalMessageChannel)await supabase.removeChannel(globalMessageChannel);
   globalMessageChannel=supabase.channel('balbul-incoming-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveIncomingMessage(payload.new)).subscribe();
   updateChatNavDot();updateSoundButton();
   maybeStartTour();
 }
-function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel);if(globalMessageChannel){supabase.removeChannel(globalMessageChannel);globalMessageChannel=null;} }
+function showAuth() { showLanding(); activeConversation = null; if (messageChannel) supabase.removeChannel(messageChannel);if(profileChannel){supabase.removeChannel(profileChannel);profileChannel=null;}if(typeof taskChannel!=='undefined'&&taskChannel){supabase.removeChannel(taskChannel);taskChannel=null;}if(globalMessageChannel){supabase.removeChannel(globalMessageChannel);globalMessageChannel=null;} }
 // ---- Pemulihan password: tampilkan form password baru setelah klik tautan email ----
 let recovering = /(^|[#&?])type=recovery/.test(location.hash);
 function setRecoveryUi(on) {
@@ -303,17 +311,39 @@ function renderAllReadStatuses(){
     setMessageStatus(el,readAt&&created&&Date.parse(readAt)>=created?'read':'sent');
   });
 }
-function appendMessage(m){
+  function renderChatBody(text){
+    const body=document.createElement('div');body.className='message-body';
+    const links=window.BalbulShareCard?.links(text)||[];let at=0;
+    for(const item of links){if(item.start>at)body.append(document.createTextNode(text.slice(at,item.start)));const anchor=document.createElement('a');anchor.href=item.url;anchor.target='_blank';anchor.rel='noopener noreferrer';anchor.textContent=item.url;body.append(anchor);at=item.end;}
+    if(at<text.length)body.append(document.createTextNode(text.slice(at)));
+    if(links.length){const item=links[0],card=document.createElement('a');card.className='share-link-preview';card.href=item.url;card.target='_blank';card.rel='noopener noreferrer';const thumb=document.createElement('span');thumb.className='share-link-thumb';thumb.textContent=item.host.slice(0,1).toUpperCase();const copy=document.createElement('span');copy.className='share-link-copy';const host=document.createElement('strong');host.textContent=item.host;const url=document.createElement('small');url.textContent=item.url;copy.append(host,url);card.append(thumb,copy);body.append(card);}
+    return body;
+  }
+  function appendMessage(m){
   if(!activeConversation||m.conversation_id!==activeConversation.id)return;
-  let existing=$('#messages').querySelector('[data-id="'+m.id+'"]');
+    let existing=$('#messages').querySelector('[data-id="'+m.id+'"]');
   if(!existing&&m.sender_id===user.id){
-    existing=[...$('#messages').querySelectorAll('.bubble.mine[data-status="pending"]')].find(el=>el.querySelector('.message-body')?.textContent===m.body);
+      existing=[...$('#messages').querySelectorAll('.bubble.mine[data-status="pending"]')].find(el=>el.dataset.rawBody===m.body);
     if(existing){existing.dataset.id=m.id;existing.dataset.createdAt=m.created_at;existing.dataset.timeLabel=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(existing,'sent');renderAllReadStatuses();return;}
   }
   if(existing)return;
-  const el=document.createElement('div');el.className='bubble'+(m.sender_id===user.id?' mine':'');el.dataset.id=m.id;el.dataset.createdAt=m.created_at;
+    const el=document.createElement('div');el.className='bubble'+(m.sender_id===user.id?' mine':'');el.dataset.id=m.id;el.dataset.createdAt=m.created_at;el.dataset.rawBody=m.body;
   el.dataset.timeLabel=new Date(m.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-  const body=document.createElement('div');body.className='message-body';body.textContent=m.body;el.append(body);
+    let body;
+    const share=window.BalbulShareCard?.parse(m.body);
+    if(share){
+      body=document.createElement('div');body.className='message-body';
+      const card=document.createElement('article');card.className='share-message-card';
+      const heading=document.createElement('strong');heading.textContent=`Ada File dari ${share.sender} !!`;
+      const scan=document.createElement('b');scan.textContent='Scan me!';
+      const name=document.createElement('small');name.textContent=share.name;
+      const size=document.createElement('small');size.textContent=window.BalbulShareCard.formatSize(share.size);
+      const qr=document.createElement('img');qr.src=share.qr;qr.alt='QR untuk mengunduh file';
+      const link=document.createElement('a');link.href=share.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Download file';
+      const expires=document.createElement('small');expires.textContent=`Link aktif 10 menit · sampai ${new Date(share.expiresAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}`;
+      card.append(heading,scan,name,size,qr,link,expires);body.append(card);
+    }else body=renderChatBody(m.body);
+    el.append(body);
   $('#messages').append(el);
   if(m.sender_id===user.id)setMessageStatus(el,'sent');else{setMessageStatus(el,'received');markConversationRead(m.conversation_id);}
   $('#messages').scrollTop=$('#messages').scrollHeight;
@@ -346,7 +376,7 @@ $('#messageForm').addEventListener('submit',async e=>{
   const conversationId=activeConversation.id,tempId='pending-'+Date.now()+'-'+Math.random().toString(36).slice(2);
   input.value='';
   const el=document.createElement('div');el.className='bubble mine';el.dataset.id=tempId;el.dataset.createdAt=new Date().toISOString();el.dataset.timeLabel=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-  const text=document.createElement('div');text.className='message-body';text.textContent=body;el.append(text);$('#messages').append(el);setMessageStatus(el,'pending');$('#messages').scrollTop=$('#messages').scrollHeight;input.focus();
+  el.dataset.rawBody=body;el.append(renderChatBody(body));$('#messages').append(el);setMessageStatus(el,'pending');$('#messages').scrollTop=$('#messages').scrollHeight;input.focus();
   const {data,error}=await supabase.from('messages').insert({conversation_id:conversationId,sender_id:user.id,body}).select().single();
   if(error){setMessageStatus(el,'failed');el.querySelector('.delivery-status').addEventListener('click',()=>retryWebMessage(el,body,conversationId));el.querySelector('.delivery-status').title=error.message;return;}
   el.dataset.id=data.id;el.dataset.createdAt=data.created_at;el.dataset.timeLabel=new Date(data.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageStatus(el,'sent');renderAllReadStatuses();
@@ -367,15 +397,16 @@ function hubPanel(name){closeChatRoomUi();if(name==='profile')refreshPushUi();fo
 document.querySelectorAll('.nav[data-panel]').forEach(b=>b.addEventListener('click',()=>hubPanel(b.dataset.panel)));
 function renderHubProfile(){if(!profile)return;const n=profile.display_name||'BalBul User';$('#profileDisplayName').textContent=n;$('#profileEmail').textContent=user.email||'';$('#profileFriendCode').textContent=profile.friend_code||'';const largeAvatar=$('#profileAvatarLarge');largeAvatar.textContent=n[0].toUpperCase();largeAvatar.dataset.color=profile.color||'#35e0ff';$('#profileNameInput').value=n;$('#profileUsernameInput').value=profile.username||'';requestAnimationFrame(paintAvatars);}
 $('#profileForm').addEventListener('submit',async e=>{e.preventDefault();const display_name=$('#profileNameInput').value.trim(),username=$('#profileUsernameInput').value.trim().toLowerCase()||null,msg=$('#profileMessage');if(username&&!/^[a-z0-9_]{3,24}$/.test(username)){msg.textContent='Username 3–24 karakter: huruf, angka, underscore.';return;}const {data,error}=await supabase.from('profiles').update({display_name,username}).eq('id',user.id).select().single();if(error){msg.textContent=error.code==='23505'?'Username sudah dipakai.':error.message;return;}profile=data;$('#helloName').textContent=display_name;$('#myName').textContent=display_name;$('#myAvatar').textContent=display_name[0].toUpperCase();msg.textContent='Profil diperbarui.';});
-function openHubTask(t=null){editingTaskId=t?.id||null;$('#taskForm').classList.remove('hidden');$('#taskFormTitle').textContent=t?'Edit reminder':'Reminder baru';$('#taskTitle').value=t?.title||'';$('#taskDescription').value=t?.description||'';$('#taskDue').value=t?.due_at?new Date(new Date(t.due_at).getTime()-new Date(t.due_at).getTimezoneOffset()*60000).toISOString().slice(0,16):'';$('#taskPriority').value=t?.priority||'medium';$('#saveTask').textContent=t?'Simpan perubahan':'Simpan reminder';}
+function toLocalDateTime(value){if(!value)return '';const d=new Date(new Date(value).getTime()-new Date(value).getTimezoneOffset()*60000);return d.toISOString().slice(0,16);}
+function taskWhen(t){return t.kind==='reminder'?(t.reminder_at||null):(t.due_at||null);}
+function openHubTask(t=null){editingTaskId=t?.id||null;$('#taskForm').classList.remove('hidden');$('#taskFormTitle').textContent=t?'Edit tugas / pengingat':'Tugas atau pengingat baru';$('#taskTitle').value=t?.title||'';$('#taskDescription').value=t?.description||'';$('#taskKind').value=t?.kind||'reminder';$('#taskRepeat').value=t?.repeat||'none';$('#taskRepeat').disabled=$('#taskKind').value!=='reminder';$('#taskDue').value=toLocalDateTime(taskWhen(t||{}));$('#taskPriority').value=t?.priority||'medium';$('#saveTask').textContent=t?'Simpan perubahan':'Simpan';}
+$('#taskKind').onchange=()=>{$('#taskRepeat').disabled=$('#taskKind').value!=='reminder';if($('#taskKind').value==='task')$('#taskRepeat').value='none';};
 $('#addTaskBtn').onclick=()=>openHubTask();$('#cancelTask').onclick=()=>{$('#taskForm').reset();$('#taskForm').classList.add('hidden');editingTaskId=null;};
 document.querySelectorAll('.task-filter').forEach(b=>b.onclick=()=>{taskFilter=b.dataset.filter;document.querySelectorAll('.task-filter').forEach(x=>x.classList.toggle('active',x===b));renderHubTasks();});
-$('#taskForm').addEventListener('submit',async e=>{e.preventDefault();const due=$('#taskDue').value,p={title:$('#taskTitle').value.trim(),description:$('#taskDescription').value.trim()||null,due_at:due?new Date(due).toISOString():null,priority:$('#taskPriority').value,updated_at:new Date().toISOString()};$('#saveTask').disabled=true;let r=editingTaskId?await supabase.from('tasks').update(p).eq('id',editingTaskId).eq('owner_id',user.id):await supabase.from('tasks').insert({...p,owner_id:user.id,created_by:user.id,status:'pending',visibility:'personal'});$('#saveTask').disabled=false;if(r.error){alert(r.error.message);return;}$('#cancelTask').click();await loadHubTasks();});
-async function loadHubTasks(){if(!user)return;$('#taskSyncStatus').textContent='● Memuat…';const {data,error}=await supabase.from('tasks').select('*').eq('owner_id',user.id).order('due_at',{ascending:true,nullsFirst:false});if(error){$('#taskSyncStatus').textContent='● Gagal sinkron';$('#taskList').textContent=error.message;return;}personalTasks=data||[];renderHubTasks();$('#taskSyncStatus').textContent='● Tersinkron';}
-function renderHubTasks(){const pending=personalTasks.filter(t=>t.status!=='completed'&&t.status!=='cancelled'),today=new Date().toDateString();$('#pendingTaskCount').textContent=pending.length;$('#todayTaskCount').textContent=pending.filter(t=>t.due_at&&new Date(t.due_at).toDateString()===today).length;$('#doneTaskCount').textContent=personalTasks.filter(t=>t.status==='completed').length;$('#taskCount').textContent=pending.length;$('#taskCount').classList.toggle('hidden',!pending.length);const rows=personalTasks.filter(t=>taskFilter==='all'||(taskFilter==='completed'?t.status==='completed':t.status!=='completed'&&t.status!=='cancelled')),list=$('#taskList');list.replaceChildren();if(!rows.length){const e=document.createElement('div');e.className='task-empty';e.textContent='Belum ada reminder. Klik “Tambah reminder” untuk mencatat sesuatu.';list.append(e);return;}for(const t of rows){const card=document.createElement('article');card.className='task-card'+(t.status==='completed'?' is-complete':'');const done=document.createElement('button');done.className='task-check';done.textContent=t.status==='completed'?'✓':'';done.onclick=async()=>{const completed=t.status!=='completed';const {error}=await supabase.from('tasks').update({status:completed?'completed':'pending',completed_at:completed?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',t.id).eq('owner_id',user.id);if(error)alert(error.message);else loadHubTasks();};const body=document.createElement('div');body.className='task-card-body';const title=document.createElement('strong');title.textContent=t.title;const desc=document.createElement('p');desc.textContent=t.description||'';const meta=document.createElement('div');meta.className='task-meta';meta.textContent=(t.due_at?new Date(t.due_at).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}):'Tanpa deadline')+' · '+({low:'Santai',medium:'Normal',high:'Penting',urgent:'Mendesak'}[t.priority]||'Normal');body.append(title);if(t.description)body.append(desc);body.append(meta);const actions=document.createElement('div');actions.className='task-actions';const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>openHubTask(t);const del=document.createElement('button');del.textContent='Hapus';del.onclick=async()=>{if(!confirm('Hapus reminder ini?'))return;const {error}=await supabase.from('tasks').delete().eq('id',t.id).eq('owner_id',user.id);if(error)alert(error.message);else loadHubTasks();};actions.append(edit,del);card.append(done,body,actions);list.append(card);}}
-
-async function startPersonalHubSync(){if(!user)return;await loadHubTasks();openPendingPanel();if(taskChannel)supabase.removeChannel(taskChannel);taskChannel=supabase.channel('balbul-tasks-'+user.id).on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'owner_id=eq.'+user.id},()=>loadHubTasks()).subscribe();}
-supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user){setTimeout(()=>startPersonalHubSync(),0);}});
+$('#taskForm').addEventListener('submit',async e=>{e.preventDefault();const when=$('#taskDue').value,kind=$('#taskKind').value,stamp=when?new Date(when).toISOString():null,p={title:$('#taskTitle').value.trim(),description:$('#taskDescription').value.trim()||null,kind,repeat:kind==='reminder'?$('#taskRepeat').value:'none',due_at:kind==='task'?stamp:null,reminder_at:kind==='reminder'?stamp:null,priority:$('#taskPriority').value,updated_at:new Date().toISOString()};if(kind==='reminder'&&!stamp){alert('Pilih tanggal dan waktu pengingat.');return;}$('#saveTask').disabled=true;let r=editingTaskId?await supabase.from('tasks').update(p).eq('id',editingTaskId).eq('owner_id',user.id):await supabase.from('tasks').insert({...p,owner_id:user.id,created_by:user.id,status:'pending',visibility:'personal'});$('#saveTask').disabled=false;if(r.error){alert(r.error.message);return;}$('#cancelTask').click();await loadHubTasks();});
+async function loadHubTasks(){if(!user)return;$('#taskSyncStatus').textContent='● Memuat…';const {data,error}=await supabase.from('tasks').select('*').eq('owner_id',user.id).eq('visibility','personal').order('created_at',{ascending:false});if(error){$('#taskSyncStatus').textContent='● Gagal sinkron';$('#taskList').textContent=error.message;return;}personalTasks=data||[];renderHubTasks();$('#taskSyncStatus').textContent='● Tersinkron';}
+function renderHubTasks(){const pending=personalTasks.filter(t=>t.status!=='completed'&&t.status!=='cancelled'),today=new Date().toDateString();$('#pendingTaskCount').textContent=pending.length;$('#todayTaskCount').textContent=pending.filter(t=>taskWhen(t)&&new Date(taskWhen(t)).toDateString()===today).length;$('#doneTaskCount').textContent=personalTasks.filter(t=>t.status==='completed').length;$('#taskCount').textContent=pending.length;$('#taskCount').classList.toggle('hidden',!pending.length);const rows=personalTasks.filter(t=>taskFilter==='all'||(taskFilter==='completed'?t.status==='completed':t.status!=='completed'&&t.status!=='cancelled')),list=$('#taskList');list.replaceChildren();if(!rows.length){const e=document.createElement('div');e.className='task-empty';e.textContent='Belum ada tugas atau pengingat. Klik “Tambah reminder” untuk mencatat sesuatu.';list.append(e);return;}for(const t of rows){const card=document.createElement('article');card.className='task-card'+(t.status==='completed'?' is-complete':'');const done=document.createElement('button');done.className='task-check';done.textContent=t.status==='completed'?'✓':'';done.onclick=async()=>{const completed=t.status!=='completed';const {error}=await supabase.from('tasks').update({status:completed?'completed':'pending',completed_at:completed?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',t.id).eq('owner_id',user.id);if(error)alert(error.message);else loadHubTasks();};const body=document.createElement('div');body.className='task-card-body';const title=document.createElement('strong');title.textContent=t.title;const desc=document.createElement('p');desc.textContent=t.description||'';const meta=document.createElement('div');meta.className='task-meta';const when=taskWhen(t),repeat={daily:' · tiap hari',weekdays:' · hari kerja',weekly:' · tiap minggu'}[t.repeat]||'';meta.textContent=(t.kind==='task'?'Tugas':'Pengingat')+' · '+(when?new Date(when).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}):'Tanpa jadwal')+repeat+' · '+({low:'Santai',medium:'Normal',high:'Penting',urgent:'Mendesak'}[t.priority]||'Normal');body.append(title);if(t.description)body.append(desc);body.append(meta);const actions=document.createElement('div');actions.className='task-actions';const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>openHubTask(t);const del=document.createElement('button');del.textContent='Hapus';del.onclick=async()=>{if(!confirm('Hapus tugas/pengingat ini?'))return;const {error}=await supabase.from('tasks').delete().eq('id',t.id).eq('owner_id',user.id);if(error)alert(error.message);else loadHubTasks();};actions.append(edit,del);card.append(done,body,actions);list.append(card);}}
+async function startPersonalHubSync(){if(!user)return;await loadHubTasks();openPendingPanel();if(taskChannel)supabase.removeChannel(taskChannel);taskChannel=supabase.channel('balbul-tasks-'+user.id).on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'owner_id=eq.'+user.id},()=>loadHubTasks()).subscribe();}supabase.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session?.user){setTimeout(()=>startPersonalHubSync(),0);}});
 if(user)startPersonalHubSync();
 
 

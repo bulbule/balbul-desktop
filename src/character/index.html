@@ -10,6 +10,21 @@
   <div id="stage">
     <div id="bubble" class="hidden">
       <div id="bubble-text"></div>
+      <section id="share-content" class="hidden" aria-live="polite">
+        <button id="share-close" type="button" aria-label="Tutup tautan">×</button>
+        <small id="share-sender" class="hidden"></small>
+        <strong id="share-title">Scan me!</strong>
+        <div id="share-name" title=""></div>
+        <small id="share-size"></small>
+        <div id="share-loading" class="hidden"><div class="qr-skeleton"></div><span>Lagi siapin link<span class="loading-dots">...</span></span></div>
+        <img id="share-qr" class="hidden" alt="QR code untuk mengunduh file">
+        <div id="share-error" class="hidden"><span id="share-error-message"></span><button id="share-retry" type="button">Coba lagi</button></div>
+        <button id="share-friend" class="hidden" type="button">🚚 Share ke Teman</button>
+        <button id="share-download" class="hidden" type="button">Download file</button>
+        <small id="share-countdown" class="hidden"></small>
+        <small id="share-warning">Siapa pun yang punya link bisa unduh file ini. Jangan bagikan ke sembarang orang.</small>
+        <small id="share-toast" class="hidden"></small>
+      </section>
       <form id="bubble-reply" class="hidden"><input id="bubble-reply-input" maxlength="4000" placeholder="Balas pesan..." autocomplete="off"><button type="submit" aria-label="Kirim balasan">➤</button></form>
       <div id="bubble-actions" class="hidden">
         <button id="btn-done" type="button">Selesai</button>
@@ -21,10 +36,12 @@
         <img id="char" src="../../assets/sprites/idle.png" draggable="false" alt="balBul">
         <div class="eye" id="eye-0"></div>
         <div class="eye" id="eye-1"></div>
+        <img id="share-box" class="hidden" src="../../assets/share/box.svg" alt="" draggable="false">
       </div>
     </div>
   </div>
   <script src="../color.js"></script>
+  <script src="../../web/share-card.js"></script>
   <script src="eyes-data.js"></script>
   <script src="character.js"></script>
 </body>

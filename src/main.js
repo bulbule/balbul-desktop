@@ -1,12 +1,15 @@
 'use strict';
 // "Otak" balBul: jendela karakter, dashboard, penyimpanan tugas, dan penjadwal pengingat.
 const {
-  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage, safeStorage, dialog,
+  app, BrowserWindow, ipcMain, Menu, Notification, Tray, screen, powerMonitor, nativeImage, safeStorage, dialog, clipboard, shell,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { autoUpdater } = require('electron-updater');
+const { ShareService } = require('./main/share-service');
+const ShareCard = require('../web/share-card');
+const QRCode = require('qrcode');
 
 app.setAppUserModelId('com.balbul.desktop'); // wajib di Windows supaya notifikasi muncul
 
@@ -20,7 +23,7 @@ const ROOT = path.join(__dirname, '..');
 const colorLib = require('./color');
 const sprite = (name) => path.join(ROOT, 'assets', 'sprites', `${name}.png`);
 const WIN_W = 340; // lebar jendela karakter
-const BUBBLE_H = 150; // ruang di atas karakter untuk bubble chat
+const BUBBLE_H = 400; // ruang untuk balon chat dan QR Share di atas karakter
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
 const REPEATS = ['none', 'daily', 'weekdays', 'weekly'];
 
@@ -51,6 +54,27 @@ let lastKey = '';
 let lastEncourage = Date.now();
 let pendingError = null;
 let dragStart = null;
+let shareQuitPending = false;
+const shareService = new ShareService({
+  app,
+  logoPath: path.join(ROOT, 'assets', 'icon.png'),
+  onEvent: (channel, payload) => {
+    if (charWin && !charWin.isDestroyed()) charWin.webContents.send(channel, payload);
+    if (channel.startsWith('receive:') && dashWin && !dashWin.isDestroyed()) dashWin.webContents.send(channel, payload);
+    if (channel === 'receive:file' && Notification.isSupported()) {
+      try { new Notification({ title: 'File baru di BalBul Drop', body: `${payload.name} · ${ShareCard.formatSize(payload.size)}`, icon: nativeImage.createFromPath(sprite('idle')) }).show(); } catch (_) { /* no notification permission */ }
+    }
+  },
+  log: (message) => {
+    console.error(`[BalBul Share] ${message}`);
+    try {
+      const file = path.join(app.getPath('userData'), 'balbul-share.log');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      if (fs.existsSync(file) && fs.statSync(file).size > 512 * 1024) fs.writeFileSync(file, '');
+      fs.appendFileSync(file, `${new Date().toISOString()} ${String(message).replace(/[\r\n\x00-\x1f\x7f]/g, ' ')}\n`);
+    } catch (_) { /* logging must not stop sharing */ }
+  },
+});
 
 // ---------------------------------------------------------------- penyimpanan (file JSON)
 const tasksPath = () => path.join(app.getPath('userData'), 'tasks.json');
@@ -271,6 +295,7 @@ function applySettings(patch) {
     }
     if (settings.showCharacter && !charWin.isVisible()) charWin.showInactive();
     if (!settings.showCharacter && charWin.isVisible()) charWin.hide();
+    if (!settings.showCharacter && shareService.active) shareService.stop('character-hidden');
   }
   if (prev.autoStart !== settings.autoStart && app.isPackaged) {
     app.setLoginItemSettings({ openAtLogin: settings.autoStart });
@@ -501,6 +526,9 @@ function createCharacterWindow() {
   });
   charWin.webContents.on('did-finish-load', () => {
     charWin.webContents.send('settings-changed', settings);
+    const b = charWin.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    charWin.webContents.send('character:edge', b.x + b.width / 2 < area.x + area.width / 2 ? 'left' : 'right');
     updateCursorPolling();
     refreshState(true);
     setTimeout(() => {
@@ -508,7 +536,8 @@ function createCharacterWindow() {
       setOverride('happy', n ? `Halo! Ada ${n} tugas yang belum selesai.` : 'Halo! Belum ada tugas, santai dulu.', 6000);
     }, 1500);
   });
-  charWin.on('closed', () => { charWin = null; });
+  charWin.webContents.on('render-process-gone', () => { if (shareService.active) shareService.stop('renderer-gone'); });
+  charWin.on('closed', () => { charWin = null; if (shareService.active) shareService.stop('character-closed'); });
 }
 
 function showDashboard({ silent = false } = {}) {
@@ -577,12 +606,72 @@ function createTray() {
 
 // ---------------------------------------------------------------- IPC
 ipcMain.handle('tasks:list', () => tasks);
+ipcMain.handle('tasks:replace-cloud-personal', (event, list) => {
+  if (!dashWin || event.sender !== dashWin.webContents || !Array.isArray(list) || list.length > 2000) return false;
+  const keep = tasks.filter((task) => task.visibility === 'shared');
+  const valid = list.filter((task) => task && typeof task.id === 'string' && typeof task.title === 'string')
+    .map((task) => ({ ...task, visibility: 'personal' }));
+  tasks = [...keep, ...valid];
+  writeJson(tasksPath(), tasks);
+  if (charWin && !charWin.isDestroyed()) charWin.webContents.send('tasks-changed', tasks);
+  refreshState(true);
+  return true;
+});
 ipcMain.handle('tasks:add', (_e, data) => addTask(data));
 ipcMain.handle('tasks:update', (_e, id, patch) => updateTask(id, patch));
 ipcMain.handle('tasks:toggle', (_e, id) => toggleTask(id));
 ipcMain.handle('tasks:delete', (_e, id) => deleteTask(id));
 ipcMain.handle('tasks:snooze', (_e, id, minutes) => snoozeTask(id, minutes));
 ipcMain.handle('tasks:ack', (_e, id) => ackTask(id));
+ipcMain.handle('share:start', (event, filePath) => {
+  if (!charWin || event.sender !== charWin.webContents) return { ok: false, code: 'denied' };
+  return shareService.start(filePath);
+});
+ipcMain.handle('share:stop', (event) => {
+  if (!charWin || event.sender !== charWin.webContents) return { ok: false, code: 'denied' };
+  return shareService.stop('closed');
+});
+ipcMain.handle('receive:start', (event) => {
+  if (!dashWin || event.sender !== dashWin.webContents) return { ok: false, code: 'denied' };
+  return shareService.startReceive();
+});
+ipcMain.handle('receive:stop', (event) => {
+  if (!dashWin || event.sender !== dashWin.webContents) return { ok: false, code: 'denied' };
+  return shareService.stop('receive-closed');
+});
+ipcMain.handle('receive:open-folder', async (event) => {
+  if (!dashWin || event.sender !== dashWin.webContents) return false;
+  const folder = path.join(app.getPath('downloads'), 'BalBul Drop');
+  await fs.promises.mkdir(folder, { recursive: true });
+  return shell.openPath(folder);
+});
+ipcMain.on('app:share-to-friend', (event, value) => {
+  if (!charWin || event.sender !== charWin.webContents) return;
+  const share = ShareCard.normalize(value);
+  if (!share || share.expiresAt <= Date.now()) return;
+  clipboard.writeText(share.url);
+  if (charWin && !charWin.isDestroyed()) charWin.webContents.send('share:copied');
+  showDashboard();
+  const sendPicker = () => {
+    if (dashWin && !dashWin.isDestroyed()) dashWin.webContents.send('share:pick-friend', share);
+  };
+  if (dashWin.webContents.isLoading()) dashWin.webContents.once('did-finish-load', sendPicker);
+  else setTimeout(sendPicker, 50);
+});
+ipcMain.on('app:open-share-download', (event, url) => {
+  if (event.sender !== charWin?.webContents && event.sender !== dashWin?.webContents) return;
+  if (typeof url !== 'string' || !ShareCard.URL_PATTERN.test(url)) return;
+  shell.openExternal(url).catch((error) => console.error('Gagal membuka download Share:', error.message));
+});
+ipcMain.on('app:open-external-link', (event, value) => {
+  if (event.sender !== charWin?.webContents && event.sender !== dashWin?.webContents) return;
+  if (typeof value !== 'string' || value.length > 2048) return;
+  try {
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return;
+    shell.openExternal(url.href).catch((error) => console.error('Gagal membuka tautan:', error.message));
+  } catch (_) { /* invalid URL */ }
+});
 // ---- sprite berwarna: biru asli diputar ke warna pilihan, hasilnya disimpan sementara (cache)
 const SPRITE_NAMES = ['idle', 'happy', 'reminder', 'urgent', 'marah', 'thinking', 'working', 'proud',
   'encourage', 'wait', 'sleep', 'afk', 'overtime', 'error', 'offline'];
@@ -634,17 +723,20 @@ ipcMain.handle('auth-storage:remove', () => {
 ipcMain.on('char:ignore', (_e, ignore) => {
   if (charWin && !charWin.isDestroyed()) charWin.setIgnoreMouseEvents(!!ignore, { forward: true });
 });
-ipcMain.on('char:drag-start', () => {
+ipcMain.on('char:drag-start', (_event, cursorX, cursorY) => {
   if (!charWin || charWin.isDestroyed()) return;
   const [x, y] = charWin.getPosition();
-  dragStart = { x, y };
+  dragStart = { x, y, cursorX: Number(cursorX), cursorY: Number(cursorY) };
 });
-ipcMain.on('char:drag-move', (_e, dx, dy) => {
+ipcMain.on('char:drag-move', (_e, cursorX, cursorY) => {
   if (!dragStart || !charWin || charWin.isDestroyed()) return;
+  cursorX = Number(cursorX); cursorY = Number(cursorY);
+  if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
   const area = screen.getDisplayMatching(charWin.getBounds()).workArea;
-  const x = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + dx)));
-  const y = Math.max(area.y, Math.min(area.y + area.height - settings.size - BUBBLE_H, Math.round(dragStart.y + dy)));
-  charWin.setBounds({ x, y, width: WIN_W, height: settings.size + BUBBLE_H });
+  const x = Math.max(area.x, Math.min(area.x + area.width - WIN_W, Math.round(dragStart.x + cursorX - dragStart.cursorX)));
+  const y = Math.max(area.y, Math.min(area.y + area.height - settings.size - BUBBLE_H, Math.round(dragStart.y + cursorY - dragStart.cursorY)));
+  charWin.setPosition(x, y, false);
+  charWin.webContents.send('character:edge', x + WIN_W / 2 < area.x + area.width / 2 ? 'left' : 'right');
 });
 ipcMain.on('char:drag-end', () => {
   if (!charWin || charWin.isDestroyed() || !dragStart) return;
@@ -667,13 +759,25 @@ ipcMain.on('char:quick-reply', (_e, payload) => {
 ipcMain.on('app:notify-chat', (_e, payload) => {
   if (!payload || typeof payload.conversationId !== 'string') return;
   const title = String(payload.title || 'Pesan baru').slice(0, 120);
-  const body = String(payload.body || '').slice(0, 500);
-  if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:chat-message', { conversationId: payload.conversationId, sender: title, body });
+  const rawBody = String(payload.body || '').slice(0, 4000);
+  const share = ShareCard.parse(rawBody);
+  const body = share ? `${share.name} · ${ShareCard.formatSize(share.size)}` : rawBody.slice(0, 500);
+  if (share) {
+    QRCode.toDataURL(share.url, { errorCorrectionLevel: 'M', margin: 4, width: 192, color: { dark: '#000000', light: '#ffffff' } })
+      .then((qr) => {
+        if (charWin && !charWin.isDestroyed()) charWin.webContents.send('character:share-received', { ...share, qr });
+      })
+      .catch((error) => console.error('QR notifikasi Share gagal:', error.message));
+  } else if (charWin && !charWin.isDestroyed()) {
+    charWin.webContents.send('character:chat-message', { conversationId: payload.conversationId, sender: title, body });
+  }
 
   if (process.platform === 'darwin' && app.dock) { try { app.dock.bounce('informational'); } catch (_e) {} } // fallback kalau izin notifikasi Mac belum aktif
   if (!Notification.isSupported()) return;
   try {
-    const n = new Notification({ title: `Pesan baru · ${title}`, body, icon: nativeImage.createFromPath(sprite('idle')) });
+    const notificationTitle = share ? `Ada file dari ${share.sender}!` : `Pesan baru · ${title}`;
+    const notificationBody = share ? `${share.name} · ${ShareCard.formatSize(share.size)} · Buka balBul untuk scan QR` : body;
+    const n = new Notification({ title: notificationTitle, body: notificationBody, icon: nativeImage.createFromPath(sprite('idle')) });
     n.on('click', () => {
       showDashboard();
       if (dashWin && !dashWin.isDestroyed()) {
@@ -720,5 +824,16 @@ app.whenReady().then(() => {
 });
 
 app.on('second-instance', showDashboard);
-app.on('before-quit', () => { quitting = true; });
+app.on('before-quit', (event) => {
+  quitting = true;
+  if (!shareService.active) return;
+  event.preventDefault();
+  if (shareQuitPending) return;
+  shareQuitPending = true;
+  shareService.stop('quit', false).finally(() => {
+    shareQuitPending = false;
+    app.quit();
+  });
+});
+app.on('will-quit', () => shareService.emergencyKill());
 app.on('window-all-closed', () => { /* tetap hidup di tray */ });

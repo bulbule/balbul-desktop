@@ -22,6 +22,7 @@
       <button data-view="friends" type="button">Teman</button>
       <button data-view="shared" type="button">Tugas Bersama</button>
       <button data-view="chat" type="button">Chat realtime</button>
+      <button data-view="receive" type="button">Terima File</button>
       <button data-view="settings" type="button">Pengaturan</button>
     </nav>
     <img id="side-sprite" src="../../assets/sprites/idle.png" alt="" class="side-sprite">
@@ -128,8 +129,9 @@
     </form>
   </dialog>
 
+  <script src="../../web/share-card.js"></script>
   <script src="../color.js"></script>
-  <script src="vendor/supabase.js"></script>
+  <script src="../../node_modules/@supabase/supabase-js/dist/umd/supabase.js"></script>
   <script src="auth.js"></script>
   <script src="dashboard.js"></script>
 </body>

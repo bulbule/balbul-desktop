@@ -1,12 +1,11 @@
 {
   "name": "balbul-desktop",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "balBul - asisten desktop pixel art untuk pengingat dan to-do list",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "postinstall": "node scripts/vendor-supabase.js",
-    "prestart": "node scripts/vendor-supabase.js",
+    "test": "node --test",
     "dist": "electron-builder --win",
     "dist:win": "electron-builder --win nsis --x64",
     "dist:mac": "electron-builder --mac dmg --arm64 --x64"
@@ -14,7 +13,7 @@
   "author": "bulbule",
   "license": "MIT",
   "devDependencies": {
-    "electron": "latest",
+    "electron": "45.4.1",
     "electron-builder": "latest"
   },
   "build": {
@@ -28,9 +27,16 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "web/share-card.js",
       "package.json"
     ],
     "win": {
+      "extraResources": [
+        {
+          "from": "resources/cloudflared/win-x64",
+          "to": "cloudflared/win-x64"
+        }
+      ],
       "target": [
         {
           "target": "nsis",
@@ -45,6 +51,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "installerSidebar": "build/installerSidebar.bmp",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "balBul"
@@ -59,6 +66,16 @@
       }
     ],
     "mac": {
+      "extraResources": [
+        {
+          "from": "resources/cloudflared/mac-arm64",
+          "to": "cloudflared/mac-arm64"
+        },
+        {
+          "from": "resources/cloudflared/mac-x64",
+          "to": "cloudflared/mac-x64"
+        }
+      ],
       "target": [
         {
           "target": "dmg",
@@ -77,6 +94,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.2",
-    "electron-updater": "^6.6.2"
+    "electron-updater": "^6.6.2",
+    "qrcode": "1.5.4"
   }
 }

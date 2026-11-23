@@ -1,5 +1,6 @@
 'use strict';
 const api = window.balbul;
+const ShareCard = window.BalbulShareCard;
 
 const PRIORITY_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
 const PRIORITY_LABEL = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent' };
@@ -17,6 +18,8 @@ let view = 'today';
 let editingId = null;
 let cloud = null, cloudUser = null, cloudProfile = null;
 let friendRows = [], incomingRequests = [], conversations = [], activeConversation = null;
+let pendingShareLink = null;
+let receiveShare = null, receivedFiles = [];
 let sharedTasks = [], taskMembersById = {};
 const openingDirectIds = new Set();
 let realtimeChannels = [];
@@ -37,13 +40,14 @@ function receiveDesktopIncoming(message){
   if(seenMessageIds.size>500)seenMessageIds.delete(seenMessageIds.values().next().value);
   if(message.sender_id===cloudUser?.id)return;
   const sameChat=activeConversation?.id===message.conversation_id;
+  const shareCard=ShareCard.parse(message.body);
   const dashboardVisible=document.visibilityState==='visible'&&document.hasFocus();
   // Pesan tetap dimasukkan ke chat yang sedang terbuka, walau dashboard sedang tersembunyi.
-  if(sameChat){appendCloudMessage(message);if(dashboardVisible)return;}
+  if(sameChat){appendCloudMessage(message);if(dashboardVisible&&!shareCard)return;}
   playIncomingSound();
-  updateChatUnread(message.conversation_id,true);
+  if(!(sameChat&&dashboardVisible))updateChatUnread(message.conversation_id,true);
   const peer=conversations.find(c=>c.id===message.conversation_id)?.other?.[0];
-  api.notifyChat({conversationId:message.conversation_id,title:peer?.display_name||'Pesan baru',body:message.body});
+  api.notifyChat({conversationId:message.conversation_id,title:shareCard?.sender||peer?.display_name||'Pesan baru',body:message.body});
 }
 
 // ---------- helper kecil untuk bikin elemen (aman dari HTML injection) ----------
@@ -61,6 +65,24 @@ function h(tag, props = {}, ...kids) {
     el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
   }
   return el;
+}
+function shareCardElement(card){
+  const link=h('button',{class:'desktop-share-download',type:'button',onclick:()=>api.openShareDownload(card.url)},'Download file');
+  return h('article',{class:'desktop-share-card'},h('strong',{},`Ada File dari ${card.sender} !!`),h('b',{},'Scan me!'),
+    h('small',{},card.name),h('small',{},ShareCard.formatSize(card.size)),h('img',{src:card.qr,alt:'QR untuk mengunduh file'}),link,
+    h('small',{},`Link aktif 10 menit · sampai ${new Date(card.expiresAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}`));
+}
+function linkPreviewElement(link){
+  return h('a',{class:'desktop-link-preview',href:link.url,target:'_blank',rel:'noopener noreferrer',onclick:(event)=>{event.preventDefault();api.openExternalLink(link.url);}},
+    h('span',{class:'link-thumb','aria-hidden':'true'},link.host.slice(0,1).toUpperCase()),
+    h('span',{class:'link-preview-copy'},h('strong',{},link.host),h('small',{},link.url)));
+}
+function chatBodyElement(text){
+  const body=h('div',{class:'desktop-chat-body'}), links=ShareCard.links(text);let at=0;
+  for(const link of links){if(link.start>at)body.append(document.createTextNode(text.slice(at,link.start)));body.append(h('a',{href:link.url,target:'_blank',rel:'noopener noreferrer',onclick:(event)=>{event.preventDefault();api.openExternalLink(link.url);}},link.url));at=link.end;}
+  if(at<text.length)body.append(document.createTextNode(text.slice(at)));
+  if(links.length)body.append(linkPreviewElement(links[0]));
+  return body;
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -311,6 +333,7 @@ function render() {
   else if (view === 'friends') renderFriendsView();
   else if (view === 'shared') renderSharedTasksView();
   else if (view === 'chat') renderChatView();
+  else if (view === 'receive') renderReceiveView();
   else renderTasksView();
   updateChatNavDot();
 }
@@ -423,8 +446,10 @@ $('#nav').addEventListener('click', (e) => {
 });
 
 api.on('tasks-changed', (list) => {
+  const before = tasks;
   tasks = list;
   if (view !== 'settings') render();
+  if (accountTaskSyncReady && !applyingCloudTasks) scheduleAccountTaskSync(before, list);
 });
 api.on('settings-changed', (s) => {
   settings = s;
@@ -451,7 +476,7 @@ function renderFriendsView() {
   const friends = friendRows.length ? friendRows.map(p=>h('div',{class:'cloud-person'},
     h('div',{class:'cloud-avatar','data-color':p.color},(p.display_name||'B').slice(0,1).toUpperCase()),
     h('div',{class:'cloud-person-info'},h('strong',{},p.display_name||'Teman'),h('small',{},p.friend_code||'')),
-    h('button',{class:'cloud-btn small',type:'button',onclick:(e)=>openDirectChat(p,e.currentTarget)},'Chat')))
+    h('button',{class:'cloud-btn small',type:'button',onclick:(e)=>pendingShareLink?sendShareLinkToFriend(p,e.currentTarget):openDirectChat(p,e.currentTarget)},pendingShareLink?'Kirim link':'Chat')))
     : [h('div',{class:'cloud-empty'},'Belum ada teman. Bagikan Friend ID kamu!')];
   const codeBox=h('div',{class:'cloud-code'},h('strong',{},code),
     h('button',{class:'cloud-btn',type:'button',onclick:async()=>{try{await navigator.clipboard.writeText(code);cloudNotice('Friend ID berhasil disalin.');}catch(_){cloudNotice('Friend ID: '+code,true);}}},'Salin ID'));
@@ -468,14 +493,62 @@ function renderFriendsView() {
     }catch(err){cloudNotice(err.message||'Gagal mengirim permintaan.',true);}
   }},h('input',{id:'friend-id-input',placeholder:'BUL-XXXXXX',maxlength:'20',autocomplete:'off'}),
     h('button',{class:'cloud-btn',type:'submit'},'Kirim Permintaan'));
+  const sharePrompt = pendingShareLink ? h('section',{class:'cloud-card'},
+    h('h2',{},'Pilih teman untuk menerima link'),
+    h('p',{class:'cloud-muted'},'Link akan dikirim sebagai pesan BalBul. Siapa pun yang punya link ini bisa mengunduh file selama 10 menit.'),
+    h('button',{class:'cloud-btn ghost',type:'button',onclick:()=>{pendingShareLink='';renderFriendsView();}},'Batal')) : null;
   $('#main').replaceChildren(
     h('div',{class:'head'},h('div',{},h('h1',{},'Teman'),h('div',{class:'date'},'Bangun circle produktifmu.'))),
     h('div',{id:'cloud-notice',class:'cloud-notice'}),
     h('section',{class:'cloud-card'},h('h2',{},'Friend ID kamu'),codeBox),
+    sharePrompt,
     h('section',{class:'cloud-card'},h('h2',{},'Tambah teman baru'),h('p',{class:'cloud-muted'},'Masukkan Friend ID temanmu.'),form),
     h('div',{class:'cloud-columns'},
       h('section',{class:'cloud-card'},h('h2',{},'Permintaan masuk'),h('div',{class:'cloud-list'},incoming)),
       h('section',{class:'cloud-card'},h('h2',{},'Teman kamu'),h('div',{class:'cloud-list'},friends))));
+}
+function renderReceiveView(){
+  const qr=receiveShare?h('img',{class:'receive-qr',src:receiveShare.qr,alt:'QR untuk mengirim file dari HP ke komputer'}):null;
+  const files=receivedFiles.length?receivedFiles.map(file=>h('div',{class:'receive-file'},h('span',{},file.name),h('small',{},ShareCard.formatSize(file.size)))):[h('div',{class:'cloud-empty'},'Belum ada file masuk di sesi ini.')];
+  $('#main').replaceChildren(
+    h('div',{class:'head'},h('div',{},h('h1',{},'BalBul Drop'),h('div',{class:'date'},'Kirim file dari HP langsung ke komputer.'))),
+    h('div',{id:'cloud-notice',class:'cloud-notice'}),
+    h('section',{class:'cloud-card receive-card'},
+      h('div',{class:'receive-brand'},h('img',{src:'../../assets/icon.png',alt:''}),h('strong',{},'BalBul Drop')),
+      h('p',{class:'cloud-muted'},'Scan QR dengan kamera HP, pilih file, lalu kirim. File masuk ke folder Downloads/BalBul Drop.'),
+      qr||h('div',{class:'receive-placeholder'},'QR akan muncul di sini'),
+      receiveShare?h('p',{class:'receive-url'},receiveShare.url):null,
+      h('p',{class:'cloud-muted'},receiveShare?`Maksimal ${Math.floor(receiveShare.maxBytes/1048576)} MB per file dan ${Math.floor(receiveShare.maxTotalBytes/1048576)} MB per sesi · QR aktif sampai ${new Date(receiveShare.expiresAt).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}`:'Sesi QR berlaku 10 menit.'),
+      h('div',{class:'receive-actions'},
+        h('button',{class:'cloud-btn primary',type:'button',onclick:startReceiveSession},receiveShare?'Buat QR Baru':'Buat QR Terima File'),
+        receiveShare?h('button',{class:'cloud-btn ghost',type:'button',onclick:()=>api.stopReceive()},'Hentikan'):null,
+        h('button',{class:'cloud-btn ghost',type:'button',onclick:()=>api.openReceiveFolder()},'Buka Folder'))),
+    h('section',{class:'cloud-card'},h('h2',{},`File Baru Masuk · ${receivedFiles.length}`),h('div',{class:'receive-files'},files)));
+}
+async function startReceiveSession(){
+  receiveShare=null;receivedFiles=[];renderReceiveView();
+  const button=$('.receive-actions .primary');if(button){button.disabled=true;button.textContent='Menyiapkan QR…';}
+  try{const result=await api.startReceive();if(!result?.ok&&view==='receive'){renderReceiveView();cloudNotice('QR belum berhasil dibuat. Coba lagi setelah koneksi internet tersedia.',true);}}
+  catch(_){if(view==='receive'){renderReceiveView();cloudNotice('QR belum berhasil dibuat. Coba lagi setelah koneksi internet tersedia.',true);}}
+}
+async function sendShareLinkToFriend(person, button) {
+  if (!pendingShareLink || !cloud || !cloudUser) return cloudNotice('Masuk ke akun balBul untuk mengirim link. Link sudah disalin agar bisa ditempel manual.',true);
+  if (button) { button.disabled=true; button.textContent='Mengirim…'; }
+  const card = pendingShareLink;
+  try {
+    const {data:conversationId,error}=await cloud.rpc('open_direct_conversation',{p_friend_id:person.id});
+    if(error)throw error;
+    await loadCloudConversations();
+    const conversation=conversations.find(x=>x.id===conversationId)||conversations.find(x=>x.kind==='direct'&&x.other.some(p=>p.id===person.id));
+    if(!conversation)throw new Error('Chat teman belum siap. Link sudah disalin.');
+    const body=ShareCard.encode({...card,sender:cloudProfile?.display_name||cloudUser.email?.split('@')[0]||'Teman'});
+    const {error:sendError}=await cloud.from('messages').insert({conversation_id:conversation.id,sender_id:cloudUser.id,body}).select().single();
+    if(sendError)throw sendError;
+    pendingShareLink=''; activeConversation=conversation; view='chat'; render();
+    cloudNotice(`Link berhasil dikirim ke ${person.display_name||'teman'}.`);
+  } catch(error) {
+    cloudNotice(`${error.message||'Gagal mengirim link.'} Link sudah disalin.`,true);
+  } finally { if(button) { button.disabled=false; button.textContent=pendingShareLink?'Kirim link':'Chat'; } }
 }
 async function loadFriendData(){
   if(!cloudUser)return;
@@ -565,8 +638,9 @@ async function loadCloudMessages(id){
 }
 function messageElement(message){
   const el=h('div',{class:'desktop-message'+(message.sender_id===cloudUser.id?' mine':'')});
-  el.dataset.messageId=message.id;
-  el.append(h('div',{},message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  el.dataset.messageId=message.id;el.dataset.rawBody=message.body;
+  const card=ShareCard.parse(message.body);
+  el.append(card?shareCardElement(card):chatBodyElement(message.body),h('time',{},new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
   if(message.sender_id===cloudUser.id)setMessageSendState(el,'sent');
   return el;
 }
@@ -590,7 +664,7 @@ function appendCloudMessage(message){
   if(!activeConversation||message.conversation_id!==activeConversation.id)return;
   const box=$('#desktop-messages');if(!box||box.querySelector('[data-message-id="'+message.id+'"]'))return;
   if(message.sender_id===cloudUser?.id){
-    const pending=[...box.querySelectorAll('[data-send-state="sending"]')].find(el=>el.firstChild?.textContent===message.body);
+    const pending=[...box.querySelectorAll('[data-send-state="sending"]')].find(el=>el.dataset.rawBody===message.body);
     if(pending){pending.dataset.messageId=message.id;const time=pending.querySelector('time');if(time)time.textContent=new Date(message.created_at).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});setMessageSendState(pending,'sent');return;}
   }
   box.append(messageElement(message));box.scrollTop=box.scrollHeight;
@@ -599,7 +673,7 @@ async function sendDesktopMessage(e){
   e.preventDefault();const input=$('#desktop-message-input');const body=input?.value.trim();if(!body||!activeConversation||!cloudUser)return;
   const conversationId=activeConversation.id;
   const box=$('#desktop-messages');const tempId='pending-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-  const el=h('div',{class:'desktop-message mine', 'data-message-id':tempId},h('div',{},body),h('time',{},new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
+  const el=h('div',{class:'desktop-message mine', 'data-message-id':tempId});el.dataset.rawBody=body;el.append(chatBodyElement(body),h('time',{},new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})));
   box?.append(el);if(box)box.scrollTop=box.scrollHeight;
   input.value='';input.focus();setMessageSendState(el,'sending');
   const submit=e.submitter; if(submit)submit.disabled=true;
@@ -621,6 +695,71 @@ let realtimeStates={};
 let reconnectTimer=null;
 let reconnectAttempt=0;
 let cloudSyncBusy=false;
+let accountTaskSyncReady=false, accountTaskSyncBusy=false, accountTaskSyncAgain=false, applyingCloudTasks=false, accountTaskSyncTimer=null;
+const TASK_OWNER_KEY='balbul-desktop-task-owner-v1';
+const taskIdsKey=(id)=>'balbul-desktop-task-ids-v1-'+id;
+const taskPersonal=(t)=>t.visibility!=='shared';
+const dateValue=(v)=>{const n=Date.parse(v||'');return Number.isFinite(n)?n:0;};
+function saveTaskIds(ids){try{localStorage.setItem(taskIdsKey(cloudUser.id),JSON.stringify([...ids]));}catch(_){}}
+function readTaskIds(){try{return new Set(JSON.parse(localStorage.getItem(taskIdsKey(cloudUser.id))||'[]'));}catch(_){return new Set();}}
+function remoteTaskToLocal(row, prior){
+  const reminder=row.kind==='reminder', when=row.reminder_at||row.due_at||null;
+  return { ...(prior||{}), id:row.id, kind:reminder?'reminder':'task', repeat:reminder?(row.repeat||'none'):'none', title:row.title||'', description:row.description||null, priority:row.priority||'medium', status:['completed','cancelled'].includes(row.status)?'done':'pending', deadline:reminder?null:(row.due_at||null), reminder_at:reminder?when:null, created_at:row.created_at, updated_at:row.updated_at, visibility:'personal', reminded:prior?.reminded??(reminder&&dateValue(when)>0&&dateValue(when)<=Date.now()), overdue_notified:prior?.overdue_notified??(!reminder&&dateValue(row.due_at)>0&&dateValue(row.due_at)<=Date.now()), snooze_until:prior?.snooze_until||null };
+}
+function localTaskToRemote(t){return {id:t.id,owner_id:cloudUser.id,created_by:cloudUser.id,title:t.title,description:t.description||null,status:t.status==='done'?'completed':'pending',priority:t.priority||'medium',visibility:'personal',kind:t.kind==='reminder'?'reminder':'task',repeat:t.kind==='reminder'?(t.repeat||'none'):'none',due_at:t.kind==='reminder'?null:(t.deadline||null),reminder_at:t.kind==='reminder'?(t.reminder_at||null):null,created_at:t.created_at||new Date().toISOString(),updated_at:t.updated_at||new Date().toISOString(),completed_at:t.status==='done'?(t.updated_at||new Date().toISOString()):null};}
+function scheduleAccountTaskSync(before=tasks, after=tasks){
+  if(!accountTaskSyncReady||!cloudUser||!cloud)return;
+  const priorIds=new Set((before||[]).filter(taskPersonal).map(t=>t.id));
+  const currentIds=new Set((after||[]).filter(taskPersonal).map(t=>t.id));
+  const known=readTaskIds();
+  for(const id of priorIds)if(!currentIds.has(id)&&known.has(id)){const key='balbul-desktop-task-deleted-v1-'+cloudUser.id;try{const removed=new Set(JSON.parse(localStorage.getItem(key)||'[]'));removed.add(id);localStorage.setItem(key,JSON.stringify([...removed]));}catch(_){}}
+  clearTimeout(accountTaskSyncTimer);accountTaskSyncTimer=setTimeout(()=>syncAccountTasks().catch(err=>{console.error('Task sync failed:',err);cloudNotice('Tugas belum tersinkron. Coba lagi saat online.',true);}),250);
+}
+async function syncAccountTasks(){
+  if(!accountTaskSyncReady||!cloudUser||!cloud)return;
+  if(accountTaskSyncBusy){accountTaskSyncAgain=true;return;}
+  accountTaskSyncBusy=true;
+  try{
+    const userId=cloudUser.id, oldOwner=localStorage.getItem(TASK_OWNER_KEY);
+    let hasAccountCache=false;
+    if(oldOwner&&oldOwner!==userId){
+      const previous=tasks.filter(taskPersonal);
+      try{localStorage.setItem('balbul-desktop-task-cache-v1-'+oldOwner,JSON.stringify(previous));}catch(_){}
+      let cached=[];try{const cacheText=localStorage.getItem('balbul-desktop-task-cache-v1-'+userId);if(cacheText!==null){cached=JSON.parse(cacheText);hasAccountCache=Array.isArray(cached);}}catch(_){cached=[];hasAccountCache=false;}
+      const safeCache=Array.isArray(cached)?cached:[];
+      tasks=[...tasks.filter(t=>!taskPersonal(t)),...safeCache];
+      applyingCloudTasks=true;await api.replaceCloudPersonalTasks(safeCache);applyingCloudTasks=false;render();
+    }
+    const {data:remote,error}=await cloud.from('tasks').select('*').eq('owner_id',userId).eq('visibility','personal');
+    if(error)throw error;
+    const remoteRows=remote||[], remoteById=new Map(remoteRows.map(t=>[t.id,t]));
+    const localRows=tasks.filter(taskPersonal), localById=new Map(localRows.map(t=>[t.id,t]));
+    const synced=(oldOwner===userId||hasAccountCache)?readTaskIds():new Set();
+    const removedKey='balbul-desktop-task-deleted-v1-'+userId;
+    let removed=new Set();try{removed=new Set(JSON.parse(localStorage.getItem(removedKey)||'[]'));}catch(_){removed=new Set();}
+    const next=[];
+    if(oldOwner===userId){
+      const deleteIds=[...removed].filter(id=>remoteById.has(id));
+      if(deleteIds.length){const {error:deleteError}=await cloud.from('tasks').delete().in('id',deleteIds).eq('owner_id',userId).eq('visibility','personal');if(deleteError)throw deleteError;deleteIds.forEach(id=>remoteById.delete(id));}
+      for(const local of localRows){const row=remoteById.get(local.id);if(!row){if(synced.has(local.id))continue;const {error:upError}=await cloud.from('tasks').upsert(localTaskToRemote(local),{onConflict:'id'});if(upError)throw upError;next.push(local);remoteById.set(local.id,localTaskToRemote(local));synced.add(local.id);continue;}
+        if(dateValue(local.updated_at)>dateValue(row.updated_at)){const {error:upError}=await cloud.from('tasks').upsert(localTaskToRemote(local),{onConflict:'id'});if(upError)throw upError;next.push(local);}
+        else next.push(remoteTaskToLocal(row,local));
+        synced.add(local.id);remoteById.delete(local.id);
+      }
+      for(const row of remoteById.values()){if(synced.has(row.id))continue;next.push(remoteTaskToLocal(row,null));synced.add(row.id);}
+    }else{
+      // Account pertama pada perangkat ini: gabungkan data lokal dengan akun. Jika akun sebelumnya berbeda, jangan unggah tugas akun lama.
+      if(hasAccountCache){const deleteIds=[...removed].filter(id=>remoteById.has(id));if(deleteIds.length){const {error:deleteError}=await cloud.from('tasks').delete().in('id',deleteIds).eq('owner_id',userId).eq('visibility','personal');if(deleteError)throw deleteError;deleteIds.forEach(id=>remoteById.delete(id));}}
+      for(const local of localRows){const row=remoteById.get(local.id);if(row){if(dateValue(local.updated_at)>dateValue(row.updated_at)){const {error:upError}=await cloud.from('tasks').upsert(localTaskToRemote(local),{onConflict:'id'});if(upError)throw upError;next.push(local);}else next.push(remoteTaskToLocal(row,local));remoteById.delete(local.id);synced.add(local.id);}else if(!oldOwner||hasAccountCache&&!synced.has(local.id)){const {error:upError}=await cloud.from('tasks').upsert(localTaskToRemote(local),{onConflict:'id'});if(upError)throw upError;next.push(local);synced.add(local.id);}}
+      for(const row of remoteById.values()){if(hasAccountCache&&synced.has(row.id))continue;next.push(remoteTaskToLocal(row,null));synced.add(row.id);}
+    }
+    if(oldOwner!==userId||JSON.stringify(localRows)!==JSON.stringify(next)){
+      applyingCloudTasks=true;tasks=[...tasks.filter(t=>!taskPersonal(t)),...next];await api.replaceCloudPersonalTasks(next);applyingCloudTasks=false;render();
+    }
+    localStorage.setItem(TASK_OWNER_KEY,userId);saveTaskIds(synced);localStorage.removeItem(removedKey);
+    localStorage.setItem('balbul-desktop-task-cache-v1-'+userId,JSON.stringify(next));
+  }finally{applyingCloudTasks=false;accountTaskSyncBusy=false;if(accountTaskSyncAgain){accountTaskSyncAgain=false;syncAccountTasks().catch(console.error);}}
+}
 function updateCloudConnectionState(){
   const states=Object.values(realtimeStates);
   const next=!navigator.onLine?'offline':(states.length&&states.every(x=>x==='SUBSCRIBED')?'online':'connecting');
@@ -670,14 +809,22 @@ function startCloudRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'friend_requests',filter:'receiver_id=eq.'+cloudUser.id},()=>loadFriendData().catch(console.error))
     .on('postgres_changes',{event:'*',schema:'public',table:'friendships'},()=>loadFriendData().catch(console.error));
   const tasksChannel=cloud.channel('balbul-desktop-tasks-'+cloudUser.id)
-    .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>loadSharedTasks().catch(console.error))
+    .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},()=>{if(accountTaskSyncReady)syncAccountTasks().catch(console.error);loadSharedTasks().catch(console.error);})
     .on('postgres_changes',{event:'*',schema:'public',table:'task_members'},()=>loadSharedTasks().catch(console.error));
+  const profileChannel=cloud.channel('balbul-desktop-profile-'+cloudUser.id)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'profiles',filter:'id=eq.'+cloudUser.id},payload=>{
+      const color=window.balbulColor?.normalizeHex(payload.new?.color);
+      if(!color)return;
+      cloudProfile={...cloudProfile,...payload.new};
+      if(color.toLowerCase()!==String(settings.color||'').toLowerCase())api.setSettings({color});
+    });
   const membersChannel=cloud.channel('balbul-desktop-members-'+cloudUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'conversation_members',filter:'user_id=eq.'+cloudUser.id},()=>syncCloudState());
   const messagesChannel=cloud.channel('balbul-all-messages-'+cloudUser.id)
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveDesktopIncoming(payload.new));
   subscribe('friends',friendsChannel);
   subscribe('tasks',tasksChannel);
+  subscribe('profile',profileChannel);
   subscribe('members',membersChannel);
   subscribe('messages',messagesChannel);
   updateCloudConnectionState();
@@ -701,16 +848,31 @@ api.on('chat:open-conversation',async ({conversationId})=>{
   activeConversation=conv;view='chat';updateChatUnread(conversationId,false);render();
   requestAnimationFrame(()=>$('#desktop-message-input')?.focus());
 });
+api.on('share:pick-friend', (value) => {
+  const card=ShareCard.normalize(value);
+  if(!card||card.expiresAt<=Date.now())return;
+  pendingShareLink=card; view='friends';
+  renderFriendsView();
+  if(!cloudUser) cloudNotice('Link disalin. Masuk ke akun balBul untuk mengirimkannya ke teman.',true);
+  else loadFriendData().catch(error=>cloudNotice(error.message||'Gagal memuat teman. Link sudah disalin.',true));
+});
+api.on('receive:ready',(data)=>{receiveShare=data;receivedFiles=[];if(view==='receive')renderReceiveView();});
+api.on('receive:file',(file)=>{receivedFiles.unshift(file);if(view==='receive')renderReceiveView();else cloudNotice(`File diterima: ${file.name}`);});
+api.on('receive:error',(error)=>{receiveShare=null;if(view==='receive'){renderReceiveView();cloudNotice(error?.message||'QR gagal dibuat.',true);}});
+api.on('receive:expired',()=>{receiveShare=null;if(view==='receive'){renderReceiveView();cloudNotice('QR sudah kedaluwarsa. Buat QR baru untuk menerima file.');}});
+api.on('receive:closed',()=>{receiveShare=null;if(view==='receive')renderReceiveView();});
 api.on('chat:quick-reply', async ({conversationId,body}) => {
   if(!cloudUser||!cloud||!conversationId||!body)return;
   try { const {error}=await cloud.from('messages').insert({conversation_id:conversationId,sender_id:cloudUser.id,body}); if(error)throw error; if(activeConversation?.id===conversationId)await loadCloudMessages(conversationId); }
   catch(err){console.error('Quick reply failed:',err);api.notifyChat({conversationId,title:'Balasan gagal',body:'Buka Dashboard untuk mencoba lagi.'});}
 });
 window.addEventListener('balbul-auth-ready',async event=>{
-  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;syncMyColor();loadUnreadChats();
+  accountTaskSyncReady=false;
+  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;loadUnreadChats();
   if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
   try{await syncCloudState();startCloudRealtime();}
   catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);scheduleCloudReconnect();}
+  if(pendingShareLink){view='friends';renderFriendsView();if(!cloudUser)cloudNotice('Link disalin. Masuk ke akun balBul untuk mengirimkannya ke teman.',true);}
 });
 
 
@@ -801,14 +963,28 @@ function renderSharedTasksView(){
 let dashboardReady = false;
 window.addEventListener('balbul-auth-ready', async () => {
   try {
-    const [list, s] = await Promise.all([api.listTasks(), api.getSettings()]);
+    const [list, localSettings] = await Promise.all([api.listTasks(), api.getSettings()]);
     tasks = list;
+    let s=localSettings;
+    const cloudColor=window.balbulColor?.normalizeHex(cloudProfile?.color);
+    if(cloudColor&&cloudColor.toLowerCase()!==String(s.color||'').toLowerCase())s=await api.setSettings({color:cloudColor});
     settings = s;
     applyTheme(s);
     dashboardReady = true;
     render();
+    accountTaskSyncReady=true;
+    await syncAccountTasks();
   } catch (error) {
     console.error('Gagal memuat dashboard:', error);
+    cloudNotice(error.message||'Gagal menyinkronkan tugas.',true);
   }
+});
+window.addEventListener('balbul-auth-signed-out',()=>{
+  accountTaskSyncReady=false;
+  clearTimeout(accountTaskSyncTimer);
+  if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
+  realtimeChannels.forEach(ch=>cloud?.removeChannel(ch));realtimeChannels=[];realtimeStates={};
+  cloudUser=null;cloudProfile=null;cloud=null;activeConversation=null;conversations=[];friendRows=[];incomingRequests=[];
+  updateCloudConnectionState();
 });
 
