@@ -301,7 +301,8 @@ function applySettings(patch) {
       const b = charWin.getBounds();
       const h = settings.size + BUBBLE_H;
       const charTop = bubbleBelow ? b.y : b.y + BUBBLE_H;
-      charWin.setBounds({ x: b.x, y: bubbleBelow ? charTop : charTop - BUBBLE_H, width: WIN_W, height: h });
+      const x = characterEdge === 'right' ? b.x + settings.size - prev.size : b.x;
+      charWin.setBounds({ x, y: bubbleBelow ? charTop : charTop - BUBBLE_H, width: WIN_W, height: h });
     }
     if (settings.showCharacter && !charWin.isVisible()) charWin.showInactive();
     if (!settings.showCharacter && charWin.isVisible()) charWin.hide();
