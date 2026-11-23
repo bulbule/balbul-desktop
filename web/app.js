@@ -364,7 +364,7 @@ $('#chatBack')?.addEventListener('click',closeChatRoomUi);
 const ICON_COPY=$('#copyCode')?.innerHTML||'';
 function hubPanel(name){closeChatRoomUi();if(name==='profile')refreshPushUi();for(const [k,s] of Object.entries({tasks:'#tasksPanel',chats:'#chatPanel',friends:'#friendsPanel',profile:'#profilePanel'}))$(s).classList.toggle('hidden',k!==name);document.querySelectorAll('.nav[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));if(name==='tasks')loadHubTasks();if(name==='profile')renderHubProfile();}
 document.querySelectorAll('.nav[data-panel]').forEach(b=>b.addEventListener('click',()=>hubPanel(b.dataset.panel)));
-function renderHubProfile(){if(!profile)return;const n=profile.display_name||'BalBul User';$('#profileDisplayName').textContent=n;$('#profileEmail').textContent=user.email||'';$('#profileFriendCode').textContent=profile.friend_code||'';$('#profileAvatarLarge').textContent=n[0].toUpperCase();$('#profileNameInput').value=n;$('#profileUsernameInput').value=profile.username||'';}
+function renderHubProfile(){if(!profile)return;const n=profile.display_name||'BalBul User';$('#profileDisplayName').textContent=n;$('#profileEmail').textContent=user.email||'';$('#profileFriendCode').textContent=profile.friend_code||'';const largeAvatar=$('#profileAvatarLarge');largeAvatar.textContent=n[0].toUpperCase();largeAvatar.dataset.color=profile.color||'#35e0ff';$('#profileNameInput').value=n;$('#profileUsernameInput').value=profile.username||'';requestAnimationFrame(paintAvatars);}
 $('#profileForm').addEventListener('submit',async e=>{e.preventDefault();const display_name=$('#profileNameInput').value.trim(),username=$('#profileUsernameInput').value.trim().toLowerCase()||null,msg=$('#profileMessage');if(username&&!/^[a-z0-9_]{3,24}$/.test(username)){msg.textContent='Username 3–24 karakter: huruf, angka, underscore.';return;}const {data,error}=await supabase.from('profiles').update({display_name,username}).eq('id',user.id).select().single();if(error){msg.textContent=error.code==='23505'?'Username sudah dipakai.':error.message;return;}profile=data;$('#helloName').textContent=display_name;$('#myName').textContent=display_name;$('#myAvatar').textContent=display_name[0].toUpperCase();msg.textContent='Profil diperbarui.';});
 function openHubTask(t=null){editingTaskId=t?.id||null;$('#taskForm').classList.remove('hidden');$('#taskFormTitle').textContent=t?'Edit reminder':'Reminder baru';$('#taskTitle').value=t?.title||'';$('#taskDescription').value=t?.description||'';$('#taskDue').value=t?.due_at?new Date(new Date(t.due_at).getTime()-new Date(t.due_at).getTimezoneOffset()*60000).toISOString().slice(0,16):'';$('#taskPriority').value=t?.priority||'medium';$('#saveTask').textContent=t?'Simpan perubahan':'Simpan reminder';}
 $('#addTaskBtn').onclick=()=>openHubTask();$('#cancelTask').onclick=()=>{$('#taskForm').reset();$('#taskForm').classList.add('hidden');editingTaskId=null;};
@@ -435,7 +435,7 @@ $('#myColor')?.addEventListener('change',async e=>{
   const {error}=await supabase.from('profiles').update({color:c}).eq('id',user.id);
   if(error){$('#colorMsg').textContent='Gagal menyimpan warna.';return;}
   profile.color=c;$('#colorMsg').textContent='Warna tersimpan. Temanmu akan melihat balBul-mu dengan warna ini.';
-  const my=$('#myAvatar');if(my)my.dataset.color=c;
+  const my=$('#myAvatar');if(my)my.dataset.color=c;const large=$('#profileAvatarLarge');if(large)large.dataset.color=c;
 });
 
 // ---- Tur awal untuk user baru ----
