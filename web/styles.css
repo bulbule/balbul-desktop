@@ -180,3 +180,5 @@
 .tour-hl{outline:3px solid #1fd2e8;outline-offset:2px;border-radius:14px;animation:tourPulse 1.2s ease-in-out infinite}
 @keyframes tourPulse{50%{outline-color:transparent}}
 .tour-actions .ghost{border-radius:999px;padding:0 22px;min-height:44px}
+
+#myColor{width:64px;height:40px;padding:2px;border:1px solid #cfe3e8;border-radius:10px;background:#fff;cursor:pointer}

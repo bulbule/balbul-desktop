@@ -587,14 +587,15 @@ ipcMain.handle('tasks:ack', (_e, id) => ackTask(id));
 const SPRITE_NAMES = ['idle', 'happy', 'reminder', 'urgent', 'marah', 'thinking', 'working', 'proud',
   'encourage', 'wait', 'sleep', 'afk', 'overtime', 'error', 'offline'];
 const spriteCache = new Map();
-function coloredDataUrl(file) {
-  const key = file + '|' + settings.color;
+function coloredDataUrl(file, color) {
+  color = colorLib.normalizeHex(color) || settings.color;
+  const key = file + '|' + color;
   if (spriteCache.has(key)) return spriteCache.get(key);
   let img = nativeImage.createFromPath(file);
-  if (!img.isEmpty() && colorLib.normalizeHex(settings.color) !== colorLib.DEFAULT) {
+  if (!img.isEmpty() && color !== colorLib.DEFAULT) {
     const { width, height } = img.getSize();
     const buf = Buffer.from(img.toBitmap());
-    colorLib.recolorPixels(buf, settings.color, 'bgra');
+    colorLib.recolorPixels(buf, color, 'bgra');
     img = nativeImage.createFromBitmap(buf, { width, height });
   }
   const url = img.toDataURL();
@@ -606,7 +607,7 @@ ipcMain.handle('sprite:get', (_e, name, noeyes) => {
   if (!SPRITE_NAMES.includes(name)) return null;
   return coloredDataUrl(sprite(name + (noeyes ? '-noeyes' : '')));
 });
-ipcMain.handle('avatar:get', () => coloredDataUrl(path.join(ROOT, 'assets', 'avatar.png')));
+ipcMain.handle('avatar:get', (_e, color) => coloredDataUrl(path.join(ROOT, 'assets', 'avatar.png'), color));
 ipcMain.handle('settings:get', () => settings);
 ipcMain.handle('settings:set', (_e, patch) => applySettings(patch));
 

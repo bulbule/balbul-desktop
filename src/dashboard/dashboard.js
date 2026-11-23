@@ -202,8 +202,30 @@ function renderTasksView() {
 }
 
 // warna balBul: aksen tampilan + ikon avatar mengikuti warna pilihan
+let myColor = null;
+function syncMyColor() {
+  const c = window.balbulColor?.normalizeHex(myColor);
+  if (!c || !cloud || !cloudUser || (cloudProfile?.color || '').toLowerCase() === c) return;
+  cloud.from('profiles').update({ color: c }).eq('id', cloudUser.id).then(({ error }) => { if (!error && cloudProfile) cloudProfile.color = c; });
+}
+// avatar teman memakai warna balBul mereka
+const friendAvatarCache = new Map();
+function paintFriendAvatars() {
+  if (!window.balbulColor) return;
+  document.querySelectorAll('.cloud-avatar[data-color]').forEach((el) => {
+    const c = window.balbulColor.normalizeHex(el.dataset.color);
+    if (!c || el.dataset.painted === c) return;
+    el.dataset.painted = c;
+    el.style.borderColor = window.balbulColor.theme(c).accent;
+    const apply = (url) => { if (url) el.style.setProperty('--avatar-img', `url("${url}")`); };
+    if (friendAvatarCache.has(c)) return apply(friendAvatarCache.get(c));
+    api.getAvatar(c).then((url) => { friendAvatarCache.set(c, url); apply(url); }).catch(() => {});
+  });
+}
+new MutationObserver(() => requestAnimationFrame(paintFriendAvatars)).observe(document.body, { childList: true, subtree: true });
 function applyTheme(s) {
   if (!s || !s.color || !window.balbulColor) return;
+  myColor = s.color; syncMyColor();
   const t = window.balbulColor.theme(s.color);
   const st = document.documentElement.style;
   st.setProperty('--accent', t.accent);
@@ -421,13 +443,13 @@ function cloudNotice(message, isError = false) {
 function renderFriendsView() {
   const code = cloudProfile?.friend_code || '—';
   const incoming = incomingRequests.length ? incomingRequests.map(req => h('div',{class:'cloud-person'},
-    h('div',{class:'cloud-avatar'},(req.sender?.display_name||'?').slice(0,1).toUpperCase()),
+    h('div',{class:'cloud-avatar','data-color':req.sender?.color},(req.sender?.display_name||'?').slice(0,1).toUpperCase()),
     h('div',{class:'cloud-person-info'},h('strong',{},req.sender?.display_name||'Pengguna balBul'),h('small',{},'Meminta untuk berteman')),
     h('button',{class:'cloud-btn small',type:'button',onclick:()=>respondFriendRequest(req,true)},'Terima'),
     h('button',{class:'cloud-btn ghost small',type:'button',onclick:()=>respondFriendRequest(req,false)},'Tolak')))
     : [h('div',{class:'cloud-empty'},'Belum ada permintaan pertemanan.')];
   const friends = friendRows.length ? friendRows.map(p=>h('div',{class:'cloud-person'},
-    h('div',{class:'cloud-avatar'},(p.display_name||'B').slice(0,1).toUpperCase()),
+    h('div',{class:'cloud-avatar','data-color':p.color},(p.display_name||'B').slice(0,1).toUpperCase()),
     h('div',{class:'cloud-person-info'},h('strong',{},p.display_name||'Teman'),h('small',{},p.friend_code||'')),
     h('button',{class:'cloud-btn small',type:'button',onclick:(e)=>openDirectChat(p,e.currentTarget)},'Chat')))
     : [h('div',{class:'cloud-empty'},'Belum ada teman. Bagikan Friend ID kamu!')];
@@ -463,7 +485,7 @@ async function loadFriendData(){
   ]);
   if(rErr)throw rErr;if(lErr)throw lErr;
   const ids=[...new Set([...(reqs||[]).map(x=>x.sender_id),...(links||[]).map(x=>x.user_low===cloudUser.id?x.user_high:x.user_low)])];
-  const {data:people,error:pErr}=ids.length?await cloud.from('profiles').select('id,display_name,friend_code').in('id',ids):{data:[],error:null};
+  const {data:people,error:pErr}=ids.length?await cloud.from('profiles').select('id,display_name,friend_code,color').in('id',ids):{data:[],error:null};
   if(pErr)throw pErr;const byId=Object.fromEntries((people||[]).map(p=>[p.id,p]));
   incomingRequests=(reqs||[]).map(req=>({...req,sender:byId[req.sender_id]}));
   friendRows=(links||[]).map(x=>byId[x.user_low===cloudUser.id?x.user_high:x.user_low]).filter(Boolean);
@@ -484,7 +506,7 @@ async function loadCloudConversations(){
   const {data:members,error:m}=await cloud.from('conversation_members').select('conversation_id,user_id').in('conversation_id',ids);if(m)throw m;
   const keyOther=c=>c.kind==='direct'&&c.direct_key?c.direct_key.split(':').find(x=>x!==cloudUser.id):null;
   const otherIds=[...new Set([...(members||[]).filter(x=>x.user_id!==cloudUser.id).map(x=>x.user_id),...(rows||[]).map(keyOther).filter(Boolean)])];
-  const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name').in('id',otherIds):{data:[],error:null};if(p)throw p;
+  const {data:people,error:p}=otherIds.length?await cloud.from('profiles').select('id,display_name,color').in('id',otherIds):{data:[],error:null};if(p)throw p;
   const byId=Object.fromEntries((people||[]).map(x=>[x.id,x]));
   const mapped=(rows||[]).map(conv=>{let other=(members||[]).filter(x=>x.conversation_id===conv.id&&x.user_id!==cloudUser.id).map(x=>byId[x.user_id]).filter(Boolean);if(!other.length&&keyOther(conv)&&byId[keyOther(conv)])other=[byId[keyOther(conv)]];return {...conv,other};});
   const seen=new Set();conversations=mapped.filter(conv=>{if(conv.kind!=='direct')return true;const otherId=conv.other[0]?.id;if(!otherId)return true;if(seen.has(otherId))return false;seen.add(otherId);return true;});
@@ -495,13 +517,13 @@ function renderChatView(){
   const list=conversations.length?conversations.map(conv=>{
     const person=conv.other[0];
     return h('button',{class:'chat-conversation'+(activeConversation?.id===conv.id?' selected':'')+(unreadChats[conv.id]?' has-unread':''),type:'button',onclick:()=>openCloudConversation(conv)},
-      h('span',{class:'cloud-avatar'},(person?.display_name||'B').slice(0,1).toUpperCase()),
+      h('span',{class:'cloud-avatar','data-color':person?.color},(person?.display_name||'B').slice(0,1).toUpperCase()),
       h('span',{},h('strong',{},person?.display_name||'Percakapan'),h('small',{},'Chat pribadi')),
       unreadChats[conv.id]?h('i',{class:'unread-dot','aria-label':'Pesan belum dibaca'}):null);
   }):[h('div',{class:'cloud-empty'},'Belum ada percakapan. Tambahkan teman dulu.')];
   const pane=h('section',{class:'chat-pane'});
   if(!activeConversation)pane.append(h('div',{class:'cloud-empty chat-placeholder'},'Pilih teman untuk mulai ngobrol.'));
-  else pane.append(h('div',{class:'chat-pane-head'},h('div',{class:'chat-peer'},h('span',{class:'cloud-avatar'},(activeConversation.other[0]?.display_name||'B').slice(0,1).toUpperCase()),h('strong',{},activeConversation.other[0]?.display_name||'Chat')),h('button',{class:'chat-leave-btn',type:'button',onclick:leaveDesktopConversation},'Hapus chat')),
+  else pane.append(h('div',{class:'chat-pane-head'},h('div',{class:'chat-peer'},h('span',{class:'cloud-avatar','data-color':activeConversation.other[0]?.color},(activeConversation.other[0]?.display_name||'B').slice(0,1).toUpperCase()),h('strong',{},activeConversation.other[0]?.display_name||'Chat')),h('button',{class:'chat-leave-btn',type:'button',onclick:leaveDesktopConversation},'Hapus chat')),
     h('div',{id:'desktop-messages',class:'desktop-messages'}),
     h('form',{class:'desktop-message-form',onsubmit:sendDesktopMessage},
       h('input',{id:'desktop-message-input',maxlength:'4000',placeholder:'Tulis pesan...',autocomplete:'off'}),
@@ -685,7 +707,7 @@ api.on('chat:quick-reply', async ({conversationId,body}) => {
   catch(err){console.error('Quick reply failed:',err);api.notifyChat({conversationId,title:'Balasan gagal',body:'Buka Dashboard untuk mencoba lagi.'});}
 });
 window.addEventListener('balbul-auth-ready',async event=>{
-  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;loadUnreadChats();
+  cloud=window.balbulCloud?.supabase;cloudUser=event.detail.user;cloudProfile=event.detail.profile;syncMyColor();loadUnreadChats();
   if(reconnectTimer){clearTimeout(reconnectTimer);reconnectTimer=null;}
   try{await syncCloudState();startCloudRealtime();}
   catch(err){console.error('Friend/chat init failed:',err);cloudNotice(err.message||'Gagal memuat teman dan chat.',true);scheduleCloudReconnect();}

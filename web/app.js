@@ -114,6 +114,8 @@ async function enterApp(currentUser) {
   $('#myEmail').textContent = user.email || '';
   $('#myCode').textContent = profile.friend_code || '—';
   $('#myAvatar').textContent = (profile.display_name || 'b').slice(0,1).toUpperCase();
+  $('#myAvatar').dataset.color = profile.color || '';
+  if($('#myColor'))$('#myColor').value = profile.color || '#35e0ff';
   await loadFriends(); await loadConversations();
   if(globalMessageChannel)await supabase.removeChannel(globalMessageChannel);
   globalMessageChannel=supabase.channel('balbul-incoming-'+user.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'messages'},payload=>receiveIncomingMessage(payload.new)).subscribe();
@@ -186,7 +188,7 @@ async function loadFriends() {
   ]);
   if (rErr) throw rErr; if (lErr) throw lErr;
   const ids=[...new Set([...(reqs||[]).map(x=>x.sender_id),...(links||[]).map(x=>x.user_low===user.id?x.user_high:x.user_low)])];
-  const {data: people,error}=ids.length?await supabase.from('profiles').select('id,display_name,username,avatar_url,friend_code').in('id',ids):{data:[],error:null};
+  const {data: people,error}=ids.length?await supabase.from('profiles').select('id,display_name,username,avatar_url,friend_code,color').in('id',ids):{data:[],error:null};
   if(error)throw error;
   const byId=Object.fromEntries((people||[]).map(p=>[p.id,p]));
   friends=(links||[]).map(x=>byId[x.user_low===user.id?x.user_high:x.user_low]).filter(Boolean);
@@ -194,8 +196,8 @@ async function loadFriends() {
   $('#friendsList').replaceChildren(...friends.map(p=>friendRow(p)));
   $('#requestCount').textContent=reqs?.length||0; $('#requestCount').classList.toggle('hidden',!reqs?.length);
 }
-function friendRow(p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small></small></div><button class="ghost chat-action" type="button">Chat</button>';row.querySelector('.avatar').textContent=(p.display_name||'b')[0].toUpperCase();row.querySelector('strong').textContent=p.display_name||'Teman';row.querySelector('small').textContent=p.username?'@'+p.username:p.friend_code;const button=row.querySelector('button');button.onclick=()=>openDirect(p,button);return row;}
-function friendRequestRow(req,p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Ingin berteman</small></div><div class="friend-actions"><button class="accept">Terima</button><button class="reject">Tolak</button></div>';row.querySelector('.avatar').textContent=(p?.display_name||'?')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||'Pengguna balBul';row.querySelector('.accept').onclick=()=>respondRequest(req,p,true);row.querySelector('.reject').onclick=()=>respondRequest(req,p,false);return row;}
+function friendRow(p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small></small></div><button class="ghost chat-action" type="button">Chat</button>';row.querySelector('.avatar').textContent=(p.display_name||'b')[0].toUpperCase();row.querySelector('.avatar').dataset.color=p.color||'';row.querySelector('strong').textContent=p.display_name||'Teman';row.querySelector('small').textContent=p.username?'@'+p.username:p.friend_code;const button=row.querySelector('button');button.onclick=()=>openDirect(p,button);return row;}
+function friendRequestRow(req,p){const row=document.createElement('div');row.className='list-row';row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Ingin berteman</small></div><div class="friend-actions"><button class="accept">Terima</button><button class="reject">Tolak</button></div>';row.querySelector('.avatar').textContent=(p?.display_name||'?')[0].toUpperCase();row.querySelector('.avatar').dataset.color=p?.color||'';row.querySelector('strong').textContent=p?.display_name||'Pengguna balBul';row.querySelector('.accept').onclick=()=>respondRequest(req,p,true);row.querySelector('.reject').onclick=()=>respondRequest(req,p,false);return row;}
 async function respondRequest(req,p,accept){let error;if(accept){({error}=await supabase.rpc('accept_friend_request',{p_request_id:req.id}));}else{({error}=await supabase.from('friend_requests').update({status:'rejected',responded_at:new Date().toISOString()}).eq('id',req.id));}if(error)return alert(error.message);await loadFriends();if(accept&&p)await openDirect(p);}
 $('#friendForm').addEventListener('submit',async e=>{e.preventDefault();const code=$('#friendCode').value.trim().toUpperCase();const {data:target,error}=await supabase.from('profiles').select('id,display_name,friend_code').eq('friend_code',code).maybeSingle();if(error)return alert(error.message);if(!target)return alert('Kode teman tidak ditemukan.');if(target.id===user.id)return alert('Itu kode kamu sendiri 😄');const {error:err}=await supabase.from('friend_requests').insert({sender_id:user.id,receiver_id:target.id});if(err)return alert(err.code==='23505'?'Permintaan sudah pernah dikirim.':err.message);$('#friendCode').value='';alert('Permintaan pertemanan dikirim!');});
 
@@ -228,7 +230,7 @@ async function loadConversations(){
   renderConversations();
   openPendingChat();
 }
-function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'')+(unreadChats[c.id]?' has-unread':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>'+(unreadChats[c.id]?'<i class="unread-dot" aria-label="Pesan belum dibaca"></i>':'');row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
+function renderConversations(){const list=$('#conversationList');list.replaceChildren();if(!conversations.length){const p=document.createElement('p');p.className='muted';p.textContent='Belum ada percakapan. Tambah teman dulu, yuk.';list.append(p);return;}for(const c of conversations){const p=c.other[0];const row=document.createElement('div');row.className='list-row'+(activeConversation?.id===c.id?' selected':'')+(unreadChats[c.id]?' has-unread':'');row.innerHTML='<div class="avatar"></div><div class="details"><strong></strong><small>Mulai ngobrol</small></div>'+(unreadChats[c.id]?'<i class="unread-dot" aria-label="Pesan belum dibaca"></i>':'');row.querySelector('.avatar').textContent=(p?.display_name||c.title||'b')[0].toUpperCase();row.querySelector('.avatar').dataset.color=p?.color||'';row.querySelector('strong').textContent=p?.display_name||c.title||'Grup balBul';row.onclick=()=>openConversation(c);list.append(row);}}
 async function openDirect(p,button){
   if(openingDirectIds.has(p.id))return;
   openingDirectIds.add(p.id);
@@ -409,6 +411,31 @@ $('#pushToggle')?.addEventListener('click',async()=>{
     }
   }catch(e){hint.textContent='Gagal: '+(e.message||e);}
   await refreshPushUi();
+});
+
+// ---- Warna balBul: avatar mengikuti warna pilihan masing-masing user ----
+const avatarUrls={};
+function avatarFor(color){return new Promise(res=>{
+  const B=window.balbulColor,c=B&&B.normalizeHex(color)||'#35e0ff';
+  if(avatarUrls[c])return res(avatarUrls[c]);
+  const img=new Image();
+  img.onload=()=>{try{const cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;const x=cv.getContext('2d');x.drawImage(img,0,0);const d=x.getImageData(0,0,cv.width,cv.height);if(c!==B.DEFAULT)B.recolorPixels(d.data,c,'rgba');x.putImageData(d,0,0);avatarUrls[c]=cv.toDataURL();res(avatarUrls[c]);}catch(_){res(null);}};
+  img.onerror=()=>res(null);img.src='./assets/avatar.png';});}
+function paintAvatars(){
+  const B=window.balbulColor;if(!B)return;
+  document.querySelectorAll('.avatar[data-color],.profile-avatar-large[data-color]').forEach(el=>{
+    const c=B.normalizeHex(el.dataset.color);if(!c||el.dataset.painted===c)return;el.dataset.painted=c;
+    el.style.borderColor=B.theme(c).accent;
+    avatarFor(c).then(url=>{if(url)el.style.backgroundImage='url("'+url+'")';});
+  });
+}
+new MutationObserver(()=>requestAnimationFrame(paintAvatars)).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-color']});
+$('#myColor')?.addEventListener('change',async e=>{
+  const c=window.balbulColor?.normalizeHex(e.target.value);if(!c||!user)return;
+  const {error}=await supabase.from('profiles').update({color:c}).eq('id',user.id);
+  if(error){$('#colorMsg').textContent='Gagal menyimpan warna.';return;}
+  profile.color=c;$('#colorMsg').textContent='Warna tersimpan. Temanmu akan melihat balBul-mu dengan warna ini.';
+  const my=$('#myAvatar');if(my)my.dataset.color=c;
 });
 
 // ---- Tur awal untuk user baru ----
