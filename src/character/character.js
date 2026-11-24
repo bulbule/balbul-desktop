@@ -284,7 +284,14 @@ api.on('settings-changed', applySettings);
 api.on('character:chat-message', (message) => {
   if (shareMode !== 'idle') return;
   incomingChat = message; clearTimeout(bubbleTimer); setState('thinking');
-  bubbleText.textContent = `✉ ${message.sender}: ${message.body}`;
+  // ikon pesan dibuat lebih besar dari teks; nama pengirim tebal
+  const chatLine = document.createElement('div'); chatLine.className = 'chat-line';
+  const chatIcon = document.createElement('span'); chatIcon.className = 'chat-ico'; chatIcon.textContent = '✉';
+  const chatTxt = document.createElement('span'); chatTxt.className = 'chat-txt';
+  const chatWho = document.createElement('strong'); chatWho.textContent = message.sender;
+  chatTxt.append(chatWho, `: ${message.body}`);
+  chatLine.append(chatIcon, chatTxt);
+  bubbleText.replaceChildren(chatLine);
   bubbleActions.classList.add('hidden'); replyForm.classList.remove('hidden'); bubble.classList.remove('hidden');
   look = { x: 0, y: -0.85 }; applyLook(); beep();
   bubbleTimer = setTimeout(hideBubble, 30000);

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.16 — 24 November 2026
+
+- Perbaiki halaman Pesan di dashboard yang berkedip dan menghapus teks yang sedang diketik. Penyebabnya app terus menyambung ulang channel chat dan menggambar ulang halaman (log Supabase: ratusan error "Too many joins on this socket"). Sekarang channel chat tidak digabung ulang kalau sudah tersambung, halaman chat tidak digambar ulang oleh event latar belakang (sinkron tugas, timer), dan draft ketikan, isi pesan, fokus, serta posisi scroll dipertahankan kalaupun digambar ulang. Jeda sambung ulang tidak lagi di-reset oleh satu channel.
+- Balon QR Share dan balon chat dikecilkan; ruang kosong di balon chat (spasi antar elemen) dihapus; ikon pesan di depan nama pengirim diperbesar.
+
 ## v1.0.15 — 24 November 2026
 
 - Perbaiki drag balBul yang berat dan tidak ikut kursor: selama diseret, jendela karakter yang besar dan transparan dikecilkan sebesar robot (robot tidak bergeser), posisi diambil dari kursor OS di proses utama dan digerakkan sekali per frame layar. Jendela dibesarkan lagi untuk balon chat/QR saat dilepas; balon disembunyikan selama diseret.
