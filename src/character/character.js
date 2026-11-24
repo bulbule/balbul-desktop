@@ -442,15 +442,25 @@ img.addEventListener('pointermove', (e) => {
   if (!drag.moved) {
     if (Math.hypot(dx, dy) < 4) return;
     drag.moved = true;
-    api.dragStart(drag.sx, drag.sy);
+    document.body.classList.add('dragging'); // balon disembunyikan selama diseret (jendela dikecilkan)
+    api.dragStart();
+    pumpDragFrames();
   }
   document.body.classList.toggle('facing-left', dx < -2);
 });
+// Kirim "frame" ke proses utama sekali per refresh layar; proses utama membaca posisi kursor
+// OS dan memindahkan jendela. Lebih mulus daripada menunggu event pointermove.
+function pumpDragFrames() {
+  if (!drag || !drag.moved) return;
+  api.dragFrame();
+  drag.raf = requestAnimationFrame(pumpDragFrames);
+}
 function finishCharacterDrag() {
   if (!drag) return;
-  const { moved } = drag;
+  const { moved, raf } = drag;
+  if (raf) cancelAnimationFrame(raf);
   drag = null;
-  document.body.classList.remove('lifted');
+  document.body.classList.remove('lifted', 'dragging');
   setState(currentState);
   if (moved) api.dragEnd();
   else api.clickCharacter();

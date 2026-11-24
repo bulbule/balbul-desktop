@@ -30,7 +30,8 @@ contextBridge.exposeInMainWorld('balbul', {
 
   // karakter
   ignoreMouse: (ignore) => ipcRenderer.send('char:ignore', ignore),
-  dragStart: (x, y) => ipcRenderer.send('char:drag-start', x, y),
+  dragStart: () => ipcRenderer.send('char:drag-start'),
+  dragFrame: () => ipcRenderer.send('char:drag-frame'),
   dragEnd: () => ipcRenderer.send('char:drag-end'),
   clickCharacter: () => ipcRenderer.send('char:click'),
   characterMenu: () => ipcRenderer.send('char:menu'),

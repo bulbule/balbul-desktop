@@ -21,6 +21,7 @@ if (!app.requestSingleInstanceLock()) {
 // ---------------------------------------------------------------- konstanta
 const ROOT = path.join(__dirname, '..');
 const colorLib = require('./color');
+const dragMath = require('./drag-math');
 const sprite = (name) => path.join(ROOT, 'assets', 'sprites', `${name}.png`);
 const WIN_W = 420; // ruang horizontal agar bubble tetap utuh di tepi layar
 const BUBBLE_H = 440; // ruang dinamis untuk bubble chat dan QR Share
@@ -760,48 +761,84 @@ ipcMain.handle('auth-storage:remove', () => {
 ipcMain.on('char:ignore', (_e, ignore) => {
   if (charWin && !charWin.isDestroyed()) charWin.setIgnoreMouseEvents(!!ignore, { forward: true });
 });
-ipcMain.on('char:drag-start', (_event, cursorX, cursorY) => {
-  if (!charWin || charWin.isDestroyed()) return;
-  cursorX = Number(cursorX); cursorY = Number(cursorY);
-  if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return;
-  const [x, y] = charWin.getPosition();
-  if (dragTimer) clearInterval(dragTimer);
-  // Anchor on the visible character, not the larger transparent chat window.
-  dragStart = {
-    offsetX: cursorX - (x + (characterEdge === 'right' ? WIN_W - settings.size : 0)),
-    offsetY: cursorY - (y + (bubbleBelow ? 0 : BUBBLE_H)),
-  };
-  // Sample the native cursor at display cadence to keep renderer IPC out of the
-  // movement loop while preserving edge alignment and the bubble's safe placement.
-  dragTimer = setInterval(() => {
-    if (!dragStart || !charWin || charWin.isDestroyed()) return;
-    const cursor = screen.getCursorScreenPoint();
-    const area = screen.getDisplayNearestPoint(cursor).workArea;
-    const charLeft = Math.max(area.x, Math.min(area.x + area.width - settings.size, Math.round(cursor.x - dragStart.offsetX)));
-    const charTop = Math.max(area.y, Math.min(area.y + area.height - settings.size, Math.round(cursor.y - dragStart.offsetY)));
-    const nextEdge = charLeft + settings.size / 2 < area.x + area.width / 2 ? 'left' : 'right';
-    const nextBubbleBelow = charTop - area.y < BUBBLE_H;
-    const edgeChanged = nextEdge !== characterEdge;
-    const placementChanged = nextBubbleBelow !== bubbleBelow;
-    characterEdge = nextEdge;
-    bubbleBelow = nextBubbleBelow;
-    const windowX = charLeft - (nextEdge === 'right' ? WIN_W - settings.size : 0);
-    const windowY = nextBubbleBelow ? charTop : charTop - BUBBLE_H;
-    charWin.setPosition(windowX, windowY, false);
-    if (edgeChanged) charWin.webContents.send('character:edge', nextEdge);
-    if (placementChanged) charWin.webContents.send('character:placement', { bubbleBelow: nextBubbleBelow });
-  }, 16);
-});
-ipcMain.on('char:drag-end', () => {
-  if (!charWin || charWin.isDestroyed() || !dragStart) return;
+// ---- geser karakter ----
+// Jendela karakter besar dan transparan (ruang balon/QR), berat kalau digeser tiap frame.
+// Selama diseret jendela dikecilkan sebesar robot (robot menempel di sudut jendela, jadi
+// tidak bergeser). Posisi diambil dari kursor OS di proses utama (satu sumber koordinat,
+// tanpa selisih skala layar) dan digerakkan tiap frame dari renderer (sinkron dengan layar).
+function stopDragWatch() {
   if (dragTimer) clearInterval(dragTimer);
   dragTimer = null;
-  const [x, y] = charWin.getPosition();
+}
+
+function moveDraggedCharacter() {
+  if (!dragStart || !charWin || charWin.isDestroyed()) return;
+  const cursor = screen.getCursorScreenPoint();
+  const area = screen.getDisplayNearestPoint(cursor).workArea;
+  const pos = dragMath.followCursor({ cursor, offset: dragStart.offset, size: settings.size, area });
+  dragStart.area = area;
+  if (pos.left === dragStart.left && pos.top === dragStart.top) return;
+  dragStart.left = pos.left;
+  dragStart.top = pos.top;
+  charWin.setBounds({ x: pos.left, y: pos.top, width: settings.size, height: settings.size }, false);
+}
+
+function finishDrag() {
+  stopDragWatch();
+  if (!dragStart) return;
+  const drag = dragStart;
   dragStart = null;
-  settings.x = x + (characterEdge === 'right' ? WIN_W - settings.size : 0);
-  settings.y = y + (bubbleBelow ? 0 : BUBBLE_H);
+  if (!charWin || charWin.isDestroyed()) return;
+  const size = settings.size;
+  const area = drag.area || screen.getDisplayNearestPoint({ x: drag.left + size / 2, y: drag.top + size / 2 }).workArea;
+  const place = dragMath.placementFor({ left: drag.left, top: drag.top, size, area, bubbleH: BUBBLE_H });
+  characterEdge = place.edge;
+  bubbleBelow = place.below;
+  settings.x = drag.left;
+  settings.y = drag.top;
   settings.edge = characterEdge;
   saveSettings();
+  // jendela masih sebesar robot, jadi mengganti sisi/penempatan sekarang tidak terlihat;
+  // beri renderer waktu menerapkannya sebelum jendela dibesarkan lagi untuk balon
+  charWin.webContents.send('character:edge', characterEdge);
+  charWin.webContents.send('character:placement', { bubbleBelow });
+  setTimeout(() => {
+    if (!charWin || charWin.isDestroyed() || dragStart) return;
+    charWin.setBounds(dragMath.fullBounds({
+      left: drag.left, top: drag.top, edge: characterEdge, below: bubbleBelow, size, winW: WIN_W, bubbleH: BUBBLE_H,
+    }), false);
+  }, 60);
+}
+
+ipcMain.on('char:drag-start', () => {
+  if (!charWin || charWin.isDestroyed()) return;
+  if (dragStart) finishDrag();
+  stopDragWatch();
+  const size = settings.size;
+  const cursor = screen.getCursorScreenPoint();
+  const robotPos = dragMath.robotFromBounds({ bounds: charWin.getBounds(), edge: characterEdge, below: bubbleBelow, size });
+  dragStart = {
+    offset: { x: cursor.x - robotPos.left, y: cursor.y - robotPos.top },
+    left: robotPos.left,
+    top: robotPos.top,
+    area: null,
+    lastFrame: Date.now(),
+  };
+  charWin.setBounds({ x: robotPos.left, y: robotPos.top, width: size, height: size }, false);
+  // cadangan: kalau renderer berhenti mengirim frame, tetap ikuti kursor
+  dragTimer = setInterval(() => {
+    if (dragStart && Date.now() - dragStart.lastFrame > 100) moveDraggedCharacter();
+  }, 50);
+});
+ipcMain.on('char:drag-frame', () => {
+  if (!dragStart) return;
+  dragStart.lastFrame = Date.now();
+  moveDraggedCharacter();
+});
+ipcMain.on('char:drag-end', () => {
+  if (!dragStart) return;
+  moveDraggedCharacter();
+  finishDrag();
 });
 ipcMain.on('char:click', toggleDashboard);
 ipcMain.on('char:menu', () => {

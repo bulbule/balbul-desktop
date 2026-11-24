@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.15 — 24 November 2026
+
+- Perbaiki drag balBul yang berat dan tidak ikut kursor: selama diseret, jendela karakter yang besar dan transparan dikecilkan sebesar robot (robot tidak bergeser), posisi diambil dari kursor OS di proses utama dan digerakkan sekali per frame layar. Jendela dibesarkan lagi untuk balon chat/QR saat dilepas; balon disembunyikan selama diseret.
+- Tambahkan migrasi database yang dibutuhkan sinkron akun: kolom tugas pribadi `kind`/`repeat`/`reminder_at`, `profiles` masuk Realtime (mencegah status macet di "Connecting"), dan `due_at` terisi otomatis dari `reminder_at` agar notifikasi push pengingat ke HP tetap jalan.
+
 ## v1.0.14 — 23 November 2026
 
 - Gerakkan karakter dengan posisi kursor OS langsung agar drag tetap responsif dan tidak tertahan batas monitor awal; klik karakter dan file drop tetap tersedia.
