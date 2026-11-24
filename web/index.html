@@ -28,17 +28,18 @@
         <span><small>Download for</small><b>Windows</b></span>
         <svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11.2m0 0L7.6 10.3M12 14.7l4.4-4.4M4.5 19.5h15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
-      <a class="button button-mac platform-button" href="https://github.com/bulbule/balbul-desktop/releases/download/v1.0.8/balBul-1.0.8-mac-arm64.dmg" id="dlMac">
+      <a class="button button-mac platform-button" href="https://github.com/bulbule/balbul-desktop/releases/latest" id="dlMac">
         <svg class="platform-icon apple-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.7 12.8c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.2.8-.7 0-1.7-.8-2.8-.8-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.2 1.1 8.2.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7s1.7.7 2.8.7 1.8-1 2.5-2c.8-1.1 1.1-2.2 1.1-2.3-.1 0-2.1-.8-2.1-3.3ZM14.6 6.7c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.2Z"/></svg>
         <span><small>Download for</small><b>macOS</b></span>
         <svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11.2m0 0L7.6 10.3M12 14.7l4.4-4.4M4.5 19.5h15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
     </div>
-    <p class="mac-note">Mac chip M (2020+) = tombol macOS. <a id="dlMacIntel" href="https://github.com/bulbule/balbul-desktop/releases/download/v1.0.8/balBul-1.0.8-mac-x64.dmg">Mac Intel? Klik di sini</a> · <a href="#install">Butuh bantuan pasang?</a></p>
+    <p class="release-note" id="releaseNote">Versi terbaru: <b id="dlVersion">…</b><span id="dlDate"></span></p>
+    <p class="mac-note">Mac chip M (2020+) = tombol macOS. <a id="dlMacIntel" href="https://github.com/bulbule/balbul-desktop/releases/latest">Mac Intel? Klik di sini</a> · <a href="#install">Butuh bantuan pasang?</a></p>
   </div>
   <div class="download-meta">
-    <div class="meta-platform"><svg class="meta-windows" viewBox="0 0 48 48" aria-hidden="true"><path fill="currentColor" d="M4 9.6 21 7v15.4H4zM24 6.6 44 3.6v18.8H24zM4 25.6h17V41L4 38.4zM24 25.6h20v18.8L24 41.4z"/></svg><div><b>Windows 10 / 11</b><small>Versi terbaru · ±120 MB</small></div></div>
-    <div class="meta-platform"><svg class="meta-apple" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.7 12.8c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.2.8-.7 0-1.7-.8-2.8-.8-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.2 1.1 8.2.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7s1.7.7 2.8.7 1.8-1 2.5-2c.8-1.1 1.1-2.2 1.1-2.3-.1 0-2.1-.8-2.1-3.3ZM14.6 6.7c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.2Z"/></svg><div><b>macOS 12+</b><small>Apple Silicon · <a href="https://github.com/bulbule/balbul-desktop/releases/download/v1.0.7/balBul-1.0.7-mac-x64.dmg" class="intel-download">Intel download</a> · ±140 MB</small></div></div>
+    <div class="meta-platform"><svg class="meta-windows" viewBox="0 0 48 48" aria-hidden="true"><path fill="currentColor" d="M4 9.6 21 7v15.4H4zM24 6.6 44 3.6v18.8H24zM4 25.6h17V41L4 38.4zM24 25.6h20v18.8L24 41.4z"/></svg><div><b>Windows 10 / 11</b><small>Versi <span class="ver-text">terbaru</span> · ±120 MB</small></div></div>
+    <div class="meta-platform"><svg class="meta-apple" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.7 12.8c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.2.8-.7 0-1.7-.8-2.8-.8-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.2 1.1 8.2.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7s1.7.7 2.8.7 1.8-1 2.5-2c.8-1.1 1.1-2.2 1.1-2.3-.1 0-2.1-.8-2.1-3.3ZM14.6 6.7c.6-.7 1-1.7.9-2.7-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.2Z"/></svg><div><b>macOS 12+</b><small>Apple Silicon · <a href="https://github.com/bulbule/balbul-desktop/releases/latest" class="intel-download">Intel download</a> · ±140 MB</small></div></div>
   </div>
 </section>
 
@@ -95,13 +96,32 @@
 })();
 </script>
 <script>
-fetch('https://api.github.com/repos/bulbule/balbul-desktop/releases/latest').then(r=>r.json()).then(r=>{
-  if(r.tag_name){var v=document.getElementById('desktopVer');if(v)v.textContent=r.tag_name;}
-  (r.assets||[]).forEach(a=>{
-    if(/mac-arm64\.dmg$/.test(a.name))document.getElementById('dlMac').href=a.browser_download_url;
-    if(/mac-x64\.dmg$/.test(a.name))document.getElementById('dlMacIntel').href=a.browser_download_url;
-  });
-}).catch(()=>{});
+(function(){
+  var KEY='balbul-latest-release-v1';
+  function fmtDate(iso){try{return new Date(iso).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});}catch(e){return '';}}
+  function apply(info){
+    if(!info||!info.tag)return;
+    var tag=info.tag;
+    var v=document.getElementById('desktopVer');if(v)v.textContent=tag;
+    var dv=document.getElementById('dlVersion');if(dv)dv.textContent=tag;
+    var dd=document.getElementById('dlDate');if(dd)dd.textContent=info.date?' · rilis '+fmtDate(info.date):'';
+    document.querySelectorAll('.ver-text').forEach(function(el){el.textContent=tag;});
+    var rn=document.getElementById('releaseNote');if(rn)rn.classList.add('has-version');
+    if(info.arm){var a=document.getElementById('dlMac');if(a)a.href=info.arm;}
+    if(info.intel){document.querySelectorAll('#dlMacIntel,.intel-download').forEach(function(el){el.href=info.intel;});}
+  }
+  try{apply(JSON.parse(localStorage.getItem(KEY)||'null'));}catch(e){}
+  fetch('https://api.github.com/repos/bulbule/balbul-desktop/releases/latest').then(function(r){return r.json();}).then(function(r){
+    if(!r||!r.tag_name)return;
+    var info={tag:r.tag_name,date:r.published_at||''};
+    (r.assets||[]).forEach(function(a){
+      if(/mac-arm64\.dmg$/.test(a.name))info.arm=a.browser_download_url;
+      if(/mac-x64\.dmg$/.test(a.name))info.intel=a.browser_download_url;
+    });
+    apply(info);
+    try{localStorage.setItem(KEY,JSON.stringify(info));}catch(e){}
+  }).catch(function(){});
+})();
 </script>
 <script src="./color.js"></script><script src="./share-card.js"></script>
 <script type="module" src="./app.js?v=20261123-color1"></script><div id="tour" class="tour hidden" role="dialog" aria-live="polite"><div class="tour-card"><div id="tourDots" class="tour-dots"></div><h3 id="tourTitle"></h3><p id="tourText"></p><div class="tour-actions"><button id="tourSkip" type="button" class="ghost">Lewati</button><button id="tourNext" type="button" class="primary">Lanjut</button></div></div></div>
